@@ -1,4 +1,6 @@
+streamlit
+flask
+ortools
 numpy
 pandas
-ortool
-streamlit
+openpyxl
