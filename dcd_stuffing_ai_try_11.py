@@ -4,6 +4,8 @@ from ortools.linear_solver import pywraplp
 import streamlit as st
 from datetime import datetime
 
+st. set_page_config(layout="wide") 
+
 # Function to load data from a CSV or Excel file with different encodings
 def load_data(file, file_type):
     if file_type == 'csv':
