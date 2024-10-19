@@ -59,13 +59,97 @@ def get_volume_class(volume_class, dcd_upper_limit):
 # Function to calculate days remaining
 def calculate_days_remaining(data):
     port_days = {
-        # Port data mapping
-        'HKG': 27, 'SHA': 29, 'SZX': 23, 'NIN': 26, 'QIN': 34, 'CAN': 22, 
-        'TSN': 28, 'XMN': 24, 'DLC': 33, 'FOC': 21, 'ZUH': 20, 'SHEKOU': 25, 
-        'YTN': 24, 'NINGDE': 26, 'JIANGYIN': 30, 'CHIWAN': 22, 'ZHANJIANG': 35, 
-        'WEIHAI': 32, 'LIANYUNGANG': 31, 'KIX': 21, 'HND': 18, 'NRT': 19, 
-        'HIA': 25, 'ICN': 20, 'BUS': 23, 'PKG': 21, 'GMP': 22, 'SIN': 15, 
-        'BKK': 30, 'KUL': 28, 'JKT': 26, 'MAN': 32
+        # Hong Kong
+        'HKG': 27, 'HONGKONG': 27, 'HONG_KONG': 27, 'hkg': 27, 'hongkong': 27, 'hong_kong': 27, 
+        'Hkg': 27, 'Hongkong': 27, 'Hong_Kong': 27, 'hong kong': 27, 'Hong Kong': 27,
+
+        # Shanghai
+        'SHA': 29, 'SHANGHAI': 29, 'SHANG_HAI': 29, 'sha': 29, 'shanghai': 29, 'shang_hai': 29, 
+        'Sha': 29, 'Shanghai': 29, 'Shang_Hai': 29,
+
+        # Shenzhen
+        'SZX': 23, 'SHZ': 23, 'SHENZHEN': 23, 'SHEN_ZHEN': 23, 'szx': 23, 'shz': 23, 
+        'shenzhen': 23, 'shen_zhen': 23, 'Szx': 23, 'Shz': 23, 'Shenzhen': 23, 'Shen_Zhen': 23,
+
+        # Ningbo
+        'NIN': 26, 'NINGBO': 26, 'NING_BO': 26, 'nin': 26, 'ningbo': 26, 'ning_bo': 26, 
+        'Nin': 26, 'Ningbo': 26, 'Ning_Bo': 26,
+
+        # Qingdao
+        'QIN': 34, 'QINGDAO': 34, 'QING_DAO': 34, 'qin': 34, 'qingdao': 34, 'qing_dao': 34, 
+        'Qin': 34, 'Qingdao': 34, 'Qing_Dao': 34,
+
+        # Guangzhou
+        'CAN': 22, 'GUANGZHOU': 22, 'GUANG_ZHOU': 22, 'can': 22, 'guangzhou': 22, 'guang_zhou': 22, 
+        'Can': 22, 'Guangzhou': 22, 'Guang_Zhou': 22,
+
+        # Tianjin
+        'TSN': 28, 'TIANJIN': 28, 'TIAN_JIN': 28, 'tsn': 28, 'tianjin': 28, 'tian_jin': 28, 
+        'Tsn': 28, 'Tianjin': 28, 'Tian_Jin': 28,
+
+        # Xiamen
+        'XMN': 24, 'XIAMEN': 24, 'XIA_MEN': 24, 'xmn': 24, 'xiamen': 24, 'xia_men': 24, 
+        'Xmn': 24, 'Xiamen': 24, 'Xia_Men': 24,
+
+        # Dalian
+        'DLC': 33, 'DALIAN': 33, 'DA_LIAN': 33, 'dlc': 33, 'dalian': 33, 'da_lian': 33, 
+        'Dlc': 33, 'Dalian': 33, 'Da_Lian': 33,
+
+        # Fuzhou
+        'FOC': 21, 'FUZHOU': 21, 'FU_ZHOU': 21, 'foc': 21, 'fuzhou': 21, 'fu_zhou': 21, 
+        'Foc': 21, 'Fuzhou': 21, 'Fu_Zhou': 21,
+
+        # Zhuhai
+        'ZUH': 20, 'ZHUHAI': 20, 'ZHU_HAI': 20, 'zuh': 20, 'zhuhai': 20, 'zhu_hai': 20, 
+        'Zuh': 20, 'Zhuhai': 20, 'Zhu_Hai': 20,
+
+        # Shekou
+        'SHEKOU': 25, 'SHE_KOU': 25, 'Shekou': 25, 'She_Kou': 25, 'shekou': 25, 'she_kou': 25,
+
+        # Yantian
+        'YTN': 24, 'YANTIAN': 24, 'YAN_TIAN': 24, 'ytn': 24, 'yantian': 24, 'yan_tian': 24, 
+        'Ytn': 24, 'Yantian': 24, 'Yan_Tian': 24,
+
+        # Other Chinese Minor Ports
+        'NINGDE': 26, 'NING_DE': 26, 'ningde': 26, 'ning_de': 26, 'Ningde': 26, 'Ning_De': 26,
+        'JIANGYIN': 30, 'JIANG_YIN': 30, 'jiangyin': 30, 'jiang_yin': 30, 'Jiangyin': 30, 'Jiang_Yin': 30,
+        'CHIWAN': 22, 'CHI_WAN': 22, 'chiwan': 22, 'chi_wan': 22, 'Chiwam': 22, 'Chi_Wan': 22,
+        'ZHANJIANG': 35, 'ZHAN_JIANG': 35, 'zhanjiang': 35, 'zhan_jiang': 35, 'Zhanjiang': 35, 'Zhan_Jiang': 35,
+        'WEIHAI': 32, 'WEI_HAI': 32, 'weihai': 32, 'wei_hai': 32, 'Weihai': 32, 'Wei_Hai': 32,
+        'LIANYUNGANG': 31, 'LIAN_YUN_GANG': 31, 'lianyungang': 31, 'lian_yun_gang': 31, 
+        'Lianyungang': 31, 'Lian_Yun_Gang': 31,
+
+        # Major Japanese Ports
+        'KIX': 21, 'OSAKA': 21, 'KIX_OSAKA': 21, 'kix': 21, 'osaka': 21, 'kix_osaka': 21, 
+        'Kix': 21, 'Osaka': 21, 'KIX_OSAKA': 21, 
+        'HND': 18, 'TOKYO': 18, 'HND_TOKYO': 18, 'hnd': 18, 'tokyo': 18, 'hnd_tokyo': 18, 
+        'Hnd': 18, 'Tokyo': 18, 'HND_TOKYO': 18,
+        'NRT': 19, 'NARITA': 19, 'NRT_NARITA': 19, 'nrt': 19, 'narita': 19, 'nrt_narita': 19, 
+        'Nrt': 19, 'Narita': 19, 'NRT_NARITA': 19,
+        'HIA': 25, 'HIROSHIMA': 25, 'HIA_HIROSHIMA': 25, 'hia': 25, 'hiroshima': 25, 'hia_hiroshima': 25,
+        'Hia': 25, 'Hiroshima': 25, 'HIA_HIROSHIMA': 25,
+
+        # Major South Korean Ports  
+        'ICN': 20, 'SEOUL': 20, 'ICN_SEOUL': 20, 'icn': 20, 'seoul': 20, 'icn_seoul': 20, 
+        'Icn': 20, 'Seoul': 20, 'ICN_SEOUL': 20, 
+        'BUS': 23, 'BUSAN': 23, 'BUS_BUSAN': 23, 'bus': 23, 'busan': 23, 'bus_bus': 23, 
+        'Bus': 23, 'Busan': 23, 'BUS_BUSAN': 23,
+        'PKG': 21, 'PUSAN': 21, 'PKG_PUSAN': 21, 'pkg': 21, 'pusan': 21, 'pkg_pusan': 21, 
+        'Pkg': 21, 'Pusan': 21, 'PKG_PUSAN': 21,
+        'GMP': 22, 'GIMPO': 22, 'GMP_GIMPO': 22, 'gmp': 22, 'gimpo': 22, 'gmp_gimpo': 22, 
+        'Gmp': 22, 'Gimpo': 22, 'GMP_GIMPO': 22,
+
+        # Major Southeast Asian Ports
+        'SIN': 15, 'SINGAPORE': 15, 'SIN_SINGAPORE': 15, 'sin': 15, 'singapore': 15, 'sin_singapore': 15, 
+        'Sin': 15, 'Singapore': 15, 'SIN_SINGAPORE': 15,
+        'BKK': 30, 'BANGKOK': 30, 'BKK_BANGKOK': 30, 'bkk': 30, 'bangkok': 30, 'bkk_bangkok': 30, 
+        'Bkk': 30, 'Bangkok': 30, 'BKK_BANGKOK': 30,
+        'KUL': 28, 'KUALA LUMPUR': 28, 'KUL_KUALA_LUMPUR': 28, 'kul': 28, 'kuala_lumpur': 28, 'kul_kuala_lumpur': 28, 
+        'Kul': 28, 'Kuala_Lumpur': 28, 'KUL_KUALA_LUMPUR': 28,
+        'JKT': 26, 'JAKARTA': 26, 'JKT_JAKARTA': 26, 'jkt': 26, 'jakarta': 26, 'jkt_jakarta': 26, 
+        'Jkt': 26, 'Jakarta': 26, 'JKT_JAKARTA': 26,
+        'MAN': 32, 'MANILA': 32, 'MAN_MANILA': 32, 'man': 32, 'manila': 32, 'man_manila': 32, 
+        'Man': 32, 'Manila': 32, 'MAN_MANILA': 32
     }
 
     current_date = datetime.now().date()
@@ -146,6 +230,108 @@ def create_packages(data, carry_capacity, carry_volume, include_cost=True, dcd_u
         data = data.drop(selected_packages).reset_index(drop=True)
 
     return packages, unfulfilled_due_to_volume
+
+# Recursive function to create packages for all weight classes and split larger ones
+def create_packages_recursive(data, weight_range, carry_volume, include_cost, dcd_upper_limit):
+    packages = []
+    unfulfilled_packages = pd.DataFrame()
+
+    while not data.empty:
+        # Optimize the maximum weight in the range
+        selected_packages, total_weight_used, total_volume_used = optimize_packages(data, weight_range[-1], carry_volume)
+
+        if not selected_packages:
+            break
+
+        selected_data = data.iloc[selected_packages]
+        job_nos = selected_data[find_job_no_column(data)].tolist()
+        total_cost = calculate_cost(total_weight_used, total_volume_used, dcd_upper_limit) if include_cost else None
+
+        # Check if weight can be split
+        if total_weight_used == 15:
+            packages.append({
+                'Job Nos': job_nos,
+                'Total Weight': 9,
+                'Total Volume': total_volume_used * (9 / 15),  # Split volume proportionally
+                'Total Cost': calculate_cost(9, total_volume_used * (9 / 15), dcd_upper_limit) if include_cost else None
+            })
+            packages.append({
+                'Job Nos': job_nos,
+                'Total Weight': 6,
+                'Total Volume': total_volume_used * (6 / 15),  # Split volume proportionally
+                'Total Cost': calculate_cost(6, total_volume_used * (6 / 15), dcd_upper_limit) if include_cost else None
+            })
+        elif total_weight_used == 18:
+            packages.append({
+                'Job Nos': job_nos,
+                'Total Weight': 15,
+                'Total Volume': total_volume_used * (15 / 18),  # Split volume proportionally
+                'Total Cost': calculate_cost(15, total_volume_used * (15 / 18), dcd_upper_limit) if include_cost else None
+            })
+            packages.append({
+                'Job Nos': job_nos,
+                'Total Weight': 6,
+                'Total Volume': total_volume_used * (6 / 18),  # Split volume proportionally
+                'Total Cost': calculate_cost(6, total_volume_used * (6 / 18), dcd_upper_limit) if include_cost else None
+            })
+            packages.append({
+                'Job Nos': job_nos,
+                'Total Weight': 9,
+                'Total Volume': total_volume_used * (9 / 18),  # Split volume proportionally
+                'Total Cost': calculate_cost(9, total_volume_used * (9 / 18), dcd_upper_limit) if include_cost else None
+            })
+
+        elif total_weight_used == 24:
+            packages.append({
+                'Job Nos': job_nos,
+                'Total Weight': 18,
+                'Total Volume': total_volume_used * (18 / 24),  # Split volume proportionally
+                'Total Cost': calculate_cost(18, total_volume_used * (18 / 24), dcd_upper_limit) if include_cost else None
+            })
+            packages.append({
+                'Job Nos': job_nos,
+                'Total Weight': 15,
+                'Total Volume': total_volume_used * (15 / 24),  # Split volume proportionally
+                'Total Cost': calculate_cost(15, total_volume_used * (15 / 24), dcd_upper_limit) if include_cost else None
+            })
+            packages.append({
+                'Job Nos': job_nos,
+                'Total Weight': 6,
+                'Total Volume': total_volume_used * (6 / 24),  # Split volume proportionally
+                'Total Cost': calculate_cost(6, total_volume_used * (6 / 24), dcd_upper_limit) if include_cost else None
+            })
+            packages.append({
+                'Job Nos': job_nos,
+                'Total Weight': 9,
+                'Total Volume': total_volume_used * (9 / 24),  # Split volume proportionally
+                'Total Cost': calculate_cost(9, total_volume_used * (9 / 24), dcd_upper_limit) if include_cost else None
+            })
+        elif not (
+            (4.5 <= total_weight_used <= 6) or
+            (7 <= total_weight_used <= 9) or
+            (10 <= total_weight_used <= 15) or
+            (16 <= total_weight_used <= 18) or
+            (20 <= total_weight_used <= 24)
+        ) or total_cost == 0:
+            unfulfilled_packages = pd.concat([unfulfilled_packages, selected_data])
+        else:
+            packages.append({
+                'Job Nos': job_nos,
+                'Total Weight': total_weight_used,
+                'Total Volume': total_volume_used,
+                'Total Cost': total_cost
+            })
+
+        data = data.drop(selected_packages).reset_index(drop=True)
+
+    # Handle smaller weight classes recursively
+    for lower_weight_class in [(4.5, 6), (7, 9), (10, 15), (16, 18), (20, 24)]:
+        if lower_weight_class[-1] < weight_range[-1]:
+            sub_packages, sub_unfulfilled = create_packages_recursive(data, lower_weight_class, carry_volume, include_cost, dcd_upper_limit)
+            packages.extend(sub_packages)
+            unfulfilled_packages = pd.concat([unfulfilled_packages, sub_unfulfilled])
+
+    return packages, unfulfilled_packages
 
 # Function to analyze weight classes and generate a report based on unfulfilled jobs
 def analyze_weight_classes(data, dcd_upper_limit, include_cost=True):
