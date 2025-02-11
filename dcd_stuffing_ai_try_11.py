@@ -164,7 +164,7 @@ def optimize_packages(data, carry_capacity, carry_volume):
         st.error(f"Data must contain columns: {required_columns}")
         return [], 0, 0
 
-    solver = pywraplp.Solver.CreateSolver('SCIP')
+    solver = pywraplp.Solver.CreateSolver('SCIP') #SCIP is currently one of the fastest non-commercial solvers for mixed integer programming (MIP) and mixed integer nonlinear programming (MINLP)
     if not solver:
         st.error("Solver creation failed. Ensure that OR-Tools is properly installed.")
         return [], 0, 0
