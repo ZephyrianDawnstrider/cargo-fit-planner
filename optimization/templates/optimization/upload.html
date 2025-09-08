@@ -1,19 +1,42 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Truck Shipment Optimization Tool</title>
-</head>
-<body>
-    <h1>Truck Shipment Optimization Tool</h1>
-    {% if error %}
-        <p style="color: red;">{{ error }}</p>
-    {% endif %}
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit">Generate Report</button>
-    </form>
-</body>
-</html>
+{% extends 'optimization/base.html' %}
+
+{% block title %}Upload Files{% endblock %}
+
+{% block content %}
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <h1 class="text-center my-4">Truck Shipment Optimization Tool</h1>
+            {% if error %}
+                <div class="alert alert-danger" role="alert">
+                    {{ error }}
+                </div>
+            {% endif %}
+            <div class="card">
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="{{ form.uploaded_file.id_for_label }}" class="form-label">{{ form.uploaded_file.label }}</label>
+                            {{ form.uploaded_file }}
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ form.volume_class.id_for_label }}" class="form-label">{{ form.volume_class.label }}</label>
+                            {{ form.volume_class }}
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ form.dcd_upper_limit.id_for_label }}" class="form-label">{{ form.dcd_upper_limit.label }}</label>
+                            {{ form.dcd_upper_limit }}
+                        </div>
+                        <div class="mb-3 form-check">
+                            {{ form.include_cost }}
+                            <label class="form-check-label" for="{{ form.include_cost.id_for_label }}">{{ form.include_cost.label }}</label>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Generate Report</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
