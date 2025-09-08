@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimization Results</title>
+    <style>
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Optimization Results</h1>
+
+    <h2>Summary Report</h2>
+    <p><strong>Best Weight Class:</strong> {{ best_class }}</p>
+    <p><strong>Total Cost for Best Weight Class:</strong> {{ total_cost_best_class }}</p>
+    <p><strong>Total Unfulfilled Count:</strong> {{ total_unfulfilled_count }}</p>
+
+    <h2>Consoles for Best Weight Class</h2>
+    {% for package in best_packages %}
+        <h3>Console</h3>
+        <p><strong>Total Weight Used:</strong> {{ package.total_weight }} tons</p>
+        <p><strong>Total Volume Used:</strong> {{ package.total_volume }} CBM</p>
+        <p><strong>Total Cost:</strong> {{ package.total_cost }}</p>
+        {{ package.console_data_html|safe }}
+    {% endfor %}
+
+    <h2>Unfulfilled Packages for Best Weight Class</h2>
+    {% for unfulfilled in unfulfilled_best %}
+        <h3>{{ unfulfilled.weight_class }}</h3>
+        {{ unfulfilled.data_html|safe }}
+    {% endfor %}
+
+    <h2>Comparative Report</h2>
+    {{ comparative_html|safe }}
+
+    <details>
+        <summary>View All Fulfilled Consoles</summary>
+        {% for fulfilled in all_fulfilled %}
+            <h3>Package {{ fulfilled.package_idx }} for Weight Class: {{ fulfilled.weight_class }}</h3>
+            <p><strong>Total Weight Used:</strong> {{ fulfilled.total_weight }} tons</p>
+            <p><strong>Total Volume Used:</strong> {{ fulfilled.total_volume }} CBM</p>
+            <p><strong>Total Cost:</strong> {{ fulfilled.total_cost }}</p>
+            {{ fulfilled.console_data_html|safe }}
+        {% endfor %}
+    </details>
+
+    <details>
+        <summary>View Unfulfilled Packages</summary>
+        {% for unfulfilled in all_unfulfilled %}
+            <h3>{{ unfulfilled.weight_class }}</h3>
+            {{ unfulfilled.data_html|safe }}
+        {% endfor %}
+    </details>
+
+    <a href="{% url 'upload' %}">Upload Another File</a>
+</body>
+</html>
