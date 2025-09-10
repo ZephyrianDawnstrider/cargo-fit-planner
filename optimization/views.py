@@ -1,33 +1,84 @@
 from django.shortcuts import render
+from django.http import JsonResponse
 from .forms import UploadForm
-from .utils import load_data, convert_weights, calculate_days_remaining, analyze_weight_classes
+from .models import Dimensions, Containertypes
+from .utils import convert_weights, analyze_weight_classes
 import pandas as pd
+import json
 
 def upload_view(request):
     if request.method == 'POST':
-        form = UploadForm(request.POST, request.FILES)
+        form = UploadForm(request.POST)
         if form.is_valid():
-            uploaded_file = request.FILES['uploaded_file']
-            volume_class = form.cleaned_data['volume_class']
-            dcd_upper_limit = form.cleaned_data['dcd_upper_limit']
+            container_type = form.cleaned_data['container_type']
+            container_sizes = form.cleaned_data['container_size']
+            selected_dimensions_ids = form.cleaned_data.get('selected_dimensions', '')
             include_cost = form.cleaned_data['include_cost']
 
-            # Determine file type
-            file_name = uploaded_file.name
-            if file_name.endswith('.csv'):
-                file_type = 'csv'
-            elif file_name.endswith(('.xlsx', '.xls')):
-                file_type = 'excel'
-            else:
-                return render(request, 'optimization/upload.html', {'form': form, 'error': 'Unsupported file type. Please upload a CSV or Excel file.'})
-
-            # Load and process data
             try:
-                data = load_data(uploaded_file, file_type)
-                data = convert_weights(data)
-                data = calculate_days_remaining(data)
+                # Determine categorytypeid based on container type
+                if container_type == 'console':
+                    categorytypeid = 7
+                elif container_type == 'closed_body_truck':
+                    categorytypeid = 8
+                else:
+                    return render(request, 'optimization/upload.html', {'form': form, 'error': 'Invalid container type selected.'})
 
-                fulfilled_files, unfulfilled_files, best_class = analyze_weight_classes(data, dcd_upper_limit, include_cost)
+                # Handle multiple container sizes
+                if not container_sizes:
+                    return render(request, 'optimization/upload.html', {'form': form, 'error': 'Please select at least one container size.'})
+
+                containers = []
+                total_volume = 0
+                total_max_weight = 0
+
+                for container_size in container_sizes:
+                    container = Containertypes.objects.filter(
+                        categorytypeid=categorytypeid,
+                        name=container_size.split(' - ')[0] if ' - ' in container_size else container_size,
+                        size=container_size.split(' - ')[1] if ' - ' in container_size else container_size
+                    ).first()
+
+                    if container:
+                        containers.append(container)
+                        total_volume += float(container.volume_cbm)
+                        total_max_weight += float(container.maxpayload_kg) / 1000  # Convert to tons
+                    else:
+                        # Try to find a default container for this category
+                        default_container = Containertypes.objects.filter(
+                            categorytypeid=categorytypeid
+                        ).first()
+                        if default_container:
+                            containers.append(default_container)
+                            total_volume += float(default_container.volume_cbm)
+                            total_max_weight += float(default_container.maxpayload_kg) / 1000
+
+                if not containers:
+                    return render(request, 'optimization/upload.html', {'form': form, 'error': 'No valid containers found.'})
+
+                # Get selected dimensions
+                if selected_dimensions_ids:
+                    selected_ids = [int(id.strip()) for id in selected_dimensions_ids.split(',') if id.strip()]
+                    dimensions = Dimensions.objects.filter(id__in=selected_ids)
+                else:
+                    dimensions = Dimensions.objects.all()
+
+                # Convert to DataFrame for processing
+                data = pd.DataFrame(list(dimensions.values(
+                    'id', 'Lenght', 'Breadth', 'Height', 'WeightPerUnit',
+                    'TotalUnits', 'PackageType', 'CargoType', 'BasePackageWeight'
+                )))
+
+                if data.empty:
+                    return render(request, 'optimization/upload.html', {'form': form, 'error': 'No dimensions data available.'})
+
+                # Calculate weight and volume
+                data = convert_weights(data)
+
+                # Use combined container volume and max payload
+                fulfilled_files, unfulfilled_files, best_class = analyze_weight_classes(
+                    data, total_volume, include_cost, total_max_weight
+                )
 
                 # Prepare data for template
                 best_packages = []
@@ -81,14 +132,14 @@ def upload_view(request):
                     total_weight = sum(pkg['Total Weight'] for pkg in packages)
                     total_volume = sum(pkg['Total Volume'] for pkg in packages)
                     total_cost = sum(pkg['Total Cost'] if pkg['Total Cost'] is not None else 0 for pkg in packages)
-                    
+
                     unfulfilled_weight = 0
                     unfulfilled_volume = 0
                     for wc, unfulfilled in unfulfilled_files:
                         if wc == weight_class:
                             unfulfilled_weight = unfulfilled['WEIGHT_TONS'].sum() if not unfulfilled.empty else 0
                             unfulfilled_volume = unfulfilled['CBM'].sum() if not unfulfilled.empty else 0
-                    
+
                     comparative_data.append({
                         'Weight Class': weight_class,
                         'Total Consoles Made': len(packages),
@@ -102,6 +153,10 @@ def upload_view(request):
                 comparative_df = pd.DataFrame(comparative_data)
                 comparative_html = comparative_df.to_html(index=False, classes='table table-striped table-bordered')
 
+                # Create container names string for display
+                container_names = [f"{c.name} - {c.size}" for c in containers]
+                selected_containers_str = ", ".join(container_names)
+
                 context = {
                     'best_class': best_class,
                     'total_cost_best_class': total_cost_best_class,
@@ -110,7 +165,10 @@ def upload_view(request):
                     'all_fulfilled': all_fulfilled,
                     'all_unfulfilled': all_unfulfilled,
                     'comparative_html': comparative_html,
-                    'total_unfulfilled_count': len(unfulfilled_files)
+                    'total_unfulfilled_count': len(unfulfilled_files),
+                    'selected_container': selected_containers_str,
+                    'max_weight': total_max_weight,
+                    'container_volume': total_volume
                 }
 
                 return render(request, 'optimization/results.html', context)
@@ -119,4 +177,24 @@ def upload_view(request):
                 return render(request, 'optimization/upload.html', {'form': form, 'error': str(e)})
     else:
         form = UploadForm()
-    return render(request, 'optimization/upload.html', {'form': form})
+
+    # Get dimensions for display
+    dimensions = Dimensions.objects.all()
+    context = {
+        'form': form,
+        'dimensions': dimensions
+    }
+    return render(request, 'optimization/upload.html', context)
+
+
+def get_container_sizes(request, container_type):
+    if container_type == 'console':
+        categorytypeid = 7
+    elif container_type == 'closed_body_truck':
+        categorytypeid = 8
+    else:
+        return JsonResponse({'error': 'Invalid container type'}, status=400)
+
+    containers = Containertypes.objects.filter(categorytypeid=categorytypeid)
+    sizes = [f"{c.name} - {c.size}" for c in containers]
+    return JsonResponse({'sizes': sizes})

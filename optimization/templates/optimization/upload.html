@@ -1,42 +1,191 @@
 {% extends 'optimization/base.html' %}
 
-{% block title %}Upload Files{% endblock %}
+{% block title %}Container Stuffing Optimization{% endblock %}
+
+{% block extra_head %}
+<!-- Select2 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+{% endblock %}
+
+{% block extra_js %}
+<!-- Select2 JS -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+{% endblock %}
 
 {% block content %}
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <h1 class="text-center my-4">Truck Shipment Optimization Tool</h1>
-            {% if error %}
-                <div class="alert alert-danger" role="alert">
-                    {{ error }}
+    <div class="container-fluid">
+        <h1 class="text-center my-4">Container Stuffing Optimization Tool</h1>
+        {% if error %}
+            <div class="alert alert-danger" role="alert">
+                {{ error }}
+            </div>
+        {% endif %}
+
+        <div class="row">
+            <!-- Dimensions Selection -->
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Select Dimensions for Stuffing</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" id="stuffing-form">
+                            {% csrf_token %}
+                            {{ form.selected_dimensions }}
+
+                            <div class="table-responsive">
+                                <table class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th><input type="checkbox" id="select-all"></th>
+                                            <th>ID</th>
+                                            <th>Package Type</th>
+                                            <th>Cargo Type</th>
+                                            <th>Length</th>
+                                            <th>Breadth</th>
+                                            <th>Height</th>
+                                            <th>Weight per Unit</th>
+                                            <th>Total Units</th>
+                                            <th>Base Package Weight</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for dimension in dimensions %}
+                                        <tr>
+                                            <td><input type="checkbox" class="dimension-checkbox" value="{{ dimension.id }}"></td>
+                                            <td>{{ dimension.id }}</td>
+                                            <td>{{ dimension.PackageType }}</td>
+                                            <td>{{ dimension.CargoType }}</td>
+                                            <td>{{ dimension.Lenght }}</td>
+                                            <td>{{ dimension.Breadth }}</td>
+                                            <td>{{ dimension.Height }}</td>
+                                            <td>{{ dimension.WeightPerUnit }}</td>
+                                            <td>{{ dimension.TotalUnits }}</td>
+                                            <td>{{ dimension.BasePackageWeight }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            {% endif %}
-            <div class="card">
-                <div class="card-body">
-                    <form method="post" enctype="multipart/form-data">
-                        {% csrf_token %}
+            </div>
+
+            <!-- Container and Options Selection -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Container Selection & Options</h5>
+                    </div>
+                    <div class="card-body">
                         <div class="mb-3">
-                            <label for="{{ form.uploaded_file.id_for_label }}" class="form-label">{{ form.uploaded_file.label }}</label>
-                            {{ form.uploaded_file }}
+                            <label for="{{ form.container_type.id_for_label }}" class="form-label">{{ form.container_type.label }}</label>
+                            {{ form.container_type }}
                         </div>
                         <div class="mb-3">
-                            <label for="{{ form.volume_class.id_for_label }}" class="form-label">{{ form.volume_class.label }}</label>
-                            {{ form.volume_class }}
-                        </div>
-                        <div class="mb-3">
-                            <label for="{{ form.dcd_upper_limit.id_for_label }}" class="form-label">{{ form.dcd_upper_limit.label }}</label>
-                            {{ form.dcd_upper_limit }}
+                            <label for="{{ form.container_size.id_for_label }}" class="form-label">{{ form.container_size.label }}</label>
+                            {{ form.container_size }}
                         </div>
                         <div class="mb-3 form-check">
                             {{ form.include_cost }}
                             <label class="form-check-label" for="{{ form.include_cost.id_for_label }}">{{ form.include_cost.label }}</label>
                         </div>
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-primary">Generate Report</button>
+                            <button type="submit" class="btn btn-primary">Optimize Stuffing</button>
                         </div>
-                    </form>
+                    </div>
+                </div>
+
+                <!-- Container Info Display -->
+                <div class="card mt-3" id="container-info" style="display: none;">
+                    <div class="card-header">
+                        <h6>Selected Container Details</h6>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Max Weight:</strong> <span id="max-weight"></span> tons</p>
+                        <p><strong>Volume:</strong> <span id="container-volume"></span> CBM</p>
+                    </div>
                 </div>
             </div>
         </div>
+        </form>
     </div>
+
+    <script>
+        $(document).ready(function() {
+            // Initialize Select2 for container size multi-select
+            $('#container_size').select2({
+                placeholder: 'Search and select container sizes...',
+                allowClear: true,
+                width: '100%'
+            });
+
+            // Select all checkboxes functionality
+            document.getElementById('select-all').addEventListener('change', function() {
+                const checkboxes = document.querySelectorAll('.dimension-checkbox');
+                checkboxes.forEach(cb => cb.checked = this.checked);
+                updateSelectedDimensions();
+            });
+
+            // Update selected dimensions on checkbox change
+            document.querySelectorAll('.dimension-checkbox').forEach(cb => {
+                cb.addEventListener('change', updateSelectedDimensions);
+            });
+
+            function updateSelectedDimensions() {
+                const selected = Array.from(document.querySelectorAll('.dimension-checkbox:checked')).map(cb => cb.value);
+                document.getElementById('id_selected_dimensions').value = selected.join(',');
+            }
+
+            // Container type change handler
+            document.getElementById('container_type').addEventListener('change', function() {
+                const containerType = this.value;
+                const sizeSelect = $('#container_size');
+
+                // Clear current options
+                sizeSelect.empty();
+
+                if (containerType) {
+                    // Fetch container sizes from server
+                    $.ajax({
+                        url: '/get_container_sizes/' + containerType + '/',
+                        type: 'GET',
+                        success: function(data) {
+                            if (data.sizes) {
+                                data.sizes.forEach(size => {
+                                    const option = new Option(size, size, false, false);
+                                    sizeSelect.append(option);
+                                });
+                                // Trigger change to refresh Select2
+                                sizeSelect.trigger('change');
+                            }
+                        },
+                        error: function() {
+                            alert('Error loading container sizes.');
+                        }
+                    });
+                }
+            });
+
+            // Container size change handler (for Select2)
+            $('#container_size').on('change', function() {
+                const selectedSizes = $(this).val();
+                const containerType = document.getElementById('container_type').value;
+
+                if (containerType && selectedSizes && selectedSizes.length > 0) {
+                    // Show container info (this would be populated with actual data)
+                    document.getElementById('container-info').style.display = 'block';
+                    // Placeholder values - would be replaced with actual container data
+                    // For multiple selections, show combined info
+                    const totalMaxWeight = selectedSizes.length * 24.0; // Example calculation
+                    const totalVolume = selectedSizes.length * 33.2; // Example calculation
+                    document.getElementById('max-weight').textContent = totalMaxWeight.toFixed(1);
+                    document.getElementById('container-volume').textContent = totalVolume.toFixed(1);
+                } else {
+                    document.getElementById('container-info').style.display = 'none';
+                }
+            });
+        });
+    </script>
 {% endblock %}

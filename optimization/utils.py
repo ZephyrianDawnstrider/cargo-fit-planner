@@ -1,166 +1,55 @@
 import numpy as np
 import pandas as pd
 from ortools.linear_solver import pywraplp
-from datetime import datetime
 
-# Function to load data from a CSV or Excel file with different encodings
-def load_data(file, file_type):
-    if file_type == 'csv':
-        for encoding in ['utf-8', 'latin-1', 'utf-16']:
-            try:
-                return pd.read_csv(file, encoding=encoding)
-            except UnicodeDecodeError:
-                continue
-        raise ValueError("Failed to load CSV file with supported encodings.")
-    elif file_type == 'excel':
-        return pd.read_excel(file)
-    else:
-        raise ValueError("Unsupported file type. Please upload a CSV or Excel file.")
-
-# Function to convert weight from kilograms to metric tons
+# Function to convert weight from database fields to metric tons and calculate volume
 def convert_weights(data):
-    weight_column = 'WEIGHT' if 'WEIGHT' in data.columns else 'Weight'
-    data['WEIGHT_TONS'] = data[weight_column] / 1000
+    # Calculate total weight per item
+    if 'WeightPerUnit' in data.columns and 'TotalUnits' in data.columns and 'BasePackageWeight' in data.columns:
+        data['WEIGHT_TONS'] = (
+            (pd.to_numeric(data['WeightPerUnit'], errors='coerce') * pd.to_numeric(data['TotalUnits'], errors='coerce')) +
+            pd.to_numeric(data['BasePackageWeight'], errors='coerce')
+        ) / 1000
+    else:
+        # Fallback for existing data
+        weight_column = 'WEIGHT' if 'WEIGHT' in data.columns else 'Weight'
+        data['WEIGHT_TONS'] = pd.to_numeric(data[weight_column], errors='coerce') / 1000
+
+    # Calculate volume
+    if 'Lenght' in data.columns and 'Breadth' in data.columns and 'Height' in data.columns:
+        data['CBM'] = (
+            pd.to_numeric(data['Lenght'], errors='coerce') *
+            pd.to_numeric(data['Breadth'], errors='coerce') *
+            pd.to_numeric(data['Height'], errors='coerce') / 1000000  # Convert cm³ to m³
+        )
+    else:
+        data['CBM'] = 0
+
     return data
 
-# Function to find the column name that contains 'Job No' or similar
-def find_job_no_column(data):
-    for col in data.columns:
-        if 'job' in col.lower():
-            return col
-    raise ValueError("No column related to 'Job No' found in the DataFrame.")
-
 # Function to calculate the cost based on weight and volume
-def calculate_cost(weight, volume, dcd_upper_limit):
+def calculate_cost(weight, volume, max_weight):
     # Costing based on weight and volume
-    if 10 <= weight <= 15 and 45 <= volume <= dcd_upper_limit:
+    if 10 <= weight <= 15 and volume <= max_weight:
         return 103000  # 15 tons
-    elif 4.5 <= weight <= 6 and 45 <= volume <= dcd_upper_limit:
+    elif 4.5 <= weight <= 6 and volume <= max_weight:
         return 78000  # 6 tons
-    elif 7 <= weight <= 9 and 45 <= volume <= dcd_upper_limit:
+    elif 7 <= weight <= 9 and volume <= max_weight:
         return 90000  # 9 tons
-    elif 16 <= weight <= 18 and 45 <= volume <= dcd_upper_limit:
+    elif 16 <= weight <= 18 and volume <= max_weight:
         return 113000  # 18 tons
-    elif 20 <= weight <= 24 and 45 <= volume <= dcd_upper_limit:
+    elif 20 <= weight <= 24 and volume <= max_weight:
         return 145000  # 24 tons
     else:
         return 0  # Return 0 for cases that don't match any condition
 
-# Function to get volume based on selected volume class
-def get_volume_class(volume_class, dcd_upper_limit):
-    if volume_class == 'DCD':
-        return dcd_upper_limit  # Use the user-defined upper limit for DCD
-    else:
-        return 0  # Return 0 for unknown volume classes
-
-# Function to calculate days remaining
-def calculate_days_remaining(data):
-    port_days = {
-        # Hong Kong
-        'HKG': 27, 'HONGKONG': 27, 'HONG_KONG': 27, 'hkg': 27, 'hongkong': 27, 'hong_kong': 27, 
-        'Hkg': 27, 'Hongkong': 27, 'Hong_Kong': 27, 'hong kong': 27, 'Hong Kong': 27,
-
-        # Shanghai
-        'SHA': 29, 'SHANGHAI': 29, 'SHANG_HAI': 29, 'sha': 29, 'shanghai': 29, 'shang_hai': 29, 
-        'Sha': 29, 'Shanghai': 29, 'Shang_Hai': 29,
-
-        # Shenzhen
-        'SZX': 23, 'SHZ': 23, 'SHENZHEN': 23, 'SHEN_ZHEN': 23, 'szx': 23, 'shz': 23, 
-        'shenzhen': 23, 'shen_zhen': 23, 'Szx': 23, 'Shz': 23, 'Shenzhen': 23, 'Shen_Zhen': 23,
-
-        # Ningbo
-        'NIN': 26, 'NINGBO': 26, 'NING_BO': 26, 'nin': 26, 'ningbo': 26, 'ning_bo': 26, 
-        'Nin': 26, 'Ningbo': 26, 'Ning_Bo': 26,
-
-        # Qingdao
-        'QIN': 34, 'QINGDAO': 34, 'QING_DAO': 34, 'qin': 34, 'qingdao': 34, 'qing_dao': 34, 
-        'Qin': 34, 'Qingdao': 34, 'Qing_Dao': 34,
-
-        # Guangzhou
-        'CAN': 22, 'GUANGZHOU': 22, 'GUANG_ZHOU': 22, 'can': 22, 'guangzhou': 22, 'guang_zhou': 22, 
-        'Can': 22, 'Guangzhou': 22, 'Guang_Zhou': 22,
-
-        # Tianjin
-        'TSN': 28, 'TIANJIN': 28, 'TIAN_JIN': 28, 'tsn': 28, 'tianjin': 28, 'tian_jin': 28, 
-        'Tsn': 28, 'Tianjin': 28, 'Tian_Jin': 28,
-
-        # Xiamen
-        'XMN': 24, 'XIAMEN': 24, 'XIA_MEN': 24, 'xmn': 24, 'xiamen': 24, 'xia_men': 24, 
-        'Xmn': 24, 'Xiamen': 24, 'Xia_Men': 24,
-
-        # Dalian
-        'DLC': 33, 'DALIAN': 33, 'DA_LIAN': 33, 'dlc': 33, 'dalian': 33, 'da_lian': 33, 
-        'Dlc': 33, 'Dalian': 33, 'Da_Lian': 33,
-
-        # Fuzhou
-        'FOC': 21, 'FUZHOU': 21, 'FU_ZHOU': 21, 'foc': 21, 'fuzhou': 21, 'fu_zhou': 21, 
-        'Foc': 21, 'Fuzhou': 21, 'Fu_Zhou': 21,
-
-        # Zhuhai
-        'ZUH': 20, 'ZHUHAI': 20, 'ZHU_HAI': 20, 'zuh': 20, 'zhuhai': 20, 'zhu_hai': 20, 
-        'Zuh': 20, 'Zhuhai': 20, 'Zhu_Hai': 20,
-
-        # Shekou
-        'SHEKOU': 25, 'SHE_KOU': 25, 'Shekou': 25, 'She_Kou': 25, 'shekou': 25, 'she_kou': 25,
-
-        # Yantian
-        'YTN': 24, 'YANTIAN': 24, 'YAN_TIAN': 24, 'ytn': 24, 'yantian': 24, 'yan_tian': 24, 
-        'Ytn': 24, 'Yantian': 24, 'Yan_Tian': 24,
-
-        # Other Chinese Minor Ports
-        'NINGDE': 26, 'NING_DE': 26, 'ningde': 26, 'ning_de': 26, 'Ningde': 26, 'Ning_De': 26,
-        'JIANGYIN': 30, 'JIANG_YIN': 30, 'jiangyin': 30, 'jiang_yin': 30, 'Jiangyin': 30, 'Jiang_Yin': 30,
-        'CHIWAN': 22, 'CHI_WAN': 22, 'chiwan': 22, 'chi_wan': 22, 'Chiwam': 22, 'Chi_Wan': 22,
-        'ZHANJIANG': 35, 'ZHAN_JIANG': 35, 'zhanjiang': 35, 'zhan_jiang': 35, 'Zhanjiang': 35, 'Zhan_Jiang': 35,
-        'WEIHAI': 32, 'WEI_HAI': 32, 'weihai': 32, 'wei_hai': 32, 'Weihai': 32, 'Wei_Hai': 32,
-        'LIANYUNGANG': 31, 'LIAN_YUN_GANG': 31, 'lianyungang': 31, 'lian_yun_gang': 31, 
-        'Lianyungang': 31, 'Lian_Yun_Gang': 31,
-
-        # Major Japanese Ports
-        'KIX': 21, 'OSAKA': 21, 'KIX_OSAKA': 21, 'kix': 21, 'osaka': 21, 'kix_osaka': 21, 
-        'Kix': 21, 'Osaka': 21, 'KIX_OSAKA': 21, 
-        'HND': 18, 'TOKYO': 18, 'HND_TOKYO': 18, 'hnd': 18, 'tokyo': 18, 'hnd_tokyo': 18, 
-        'Hnd': 18, 'Tokyo': 18, 'HND_TOKYO': 18,
-        'NRT': 19, 'NARITA': 19, 'NRT_NARITA': 19, 'nrt': 19, 'narita': 19, 'nrt_narita': 19, 
-        'Nrt': 19, 'Narita': 19, 'NRT_NARITA': 19,
-        'HIA': 25, 'HIROSHIMA': 25, 'HIA_HIROSHIMA': 25, 'hia': 25, 'hiroshima': 25, 'hia_hiroshima': 25,
-        'Hia': 25, 'Hiroshima': 25, 'HIA_HIROSHIMA': 25,
-
-        # Major South Korean Ports  
-        'ICN': 20, 'SEOUL': 20, 'ICN_SEOUL': 20, 'icn': 20, 'seoul': 20, 'icn_seoul': 20, 
-        'Icn': 20, 'Seoul': 20, 'ICN_SEOUL': 20, 
-        'BUS': 23, 'BUSAN': 23, 'BUS_BUSAN': 23, 'bus': 23, 'busan': 23, 'bus_bus': 23, 
-        'Bus': 23, 'Busan': 23, 'BUS_BUSAN': 23,
-        'PKG': 21, 'PUSAN': 21, 'PKG_PUSAN': 21, 'pkg': 21, 'pusan': 21, 'pkg_pusan': 21, 
-        'Pkg': 21, 'Pusan': 21, 'PKG_PUSAN': 21,
-        'GMP': 22, 'GIMPO': 22, 'GMP_GIMPO': 22, 'gmp': 22, 'gimpo': 22, 'gmp_gimpo': 22, 
-        'Gmp': 22, 'Gimpo': 22, 'GMP_GIMPO': 22,
-
-        # Major Southeast Asian Ports
-        'SIN': 15, 'SINGAPORE': 15, 'SIN_SINGAPORE': 15, 'sin': 15, 'singapore': 15, 'sin_singapore': 15, 
-        'Sin': 15, 'Singapore': 15, 'SIN_SINGAPORE': 15,
-        'BKK': 30, 'BANGKOK': 30, 'BKK_BANGKOK': 30, 'bkk': 30, 'bangkok': 30, 'bkk_bangkok': 30, 
-        'Bkk': 30, 'Bangkok': 30, 'BKK_BANGKOK': 30,
-        'KUL': 28, 'KUALA LUMPUR': 28, 'KUL_KUALA_LUMPUR': 28, 'kul': 28, 'kuala_lumpur': 28, 'kul_kuala_lumpur': 28, 
-        'Kul': 28, 'Kuala_Lumpur': 28, 'KUL_KUALA_LUMPUR': 28,
-        'JKT': 26, 'JAKARTA': 26, 'JKT_JAKARTA': 26, 'jkt': 26, 'jakarta': 26, 'jkt_jakarta': 26, 
-        'Jkt': 26, 'Jakarta': 26, 'JKT_JAKARTA': 26,
-        'MAN': 32, 'MANILA': 32, 'MAN_MANILA': 32, 'man': 32, 'manila': 32, 'man_manila': 32, 
-        'Man': 32, 'Manila': 32, 'MAN_MANILA': 32
-    }
-
-    current_date = datetime.now().date()
-    data['ETD'] = pd.to_datetime(data['ETD'], errors='coerce')
-    data['DAYS_REMAINING'] = data.apply(lambda row: port_days.get(row['POL'], 0) - (current_date - row['ETD'].date()).days if pd.notnull(row['ETD']) else 0, axis=1)
-    return data
-
 # Function to optimize package selection based on weight and volume constraints
 def optimize_packages(data, carry_capacity, carry_volume):
-    required_columns = ['WEIGHT_TONS', 'CBM', 'DAYS_REMAINING']
+    required_columns = ['WEIGHT_TONS', 'CBM']
     if not all(col in data.columns for col in required_columns):
         raise ValueError(f"Data must contain columns: {required_columns}")
 
-    solver = pywraplp.Solver.CreateSolver('SCIP') #SCIP is currently one of the fastest non-commercial solvers for mixed integer programming (MIP) and mixed integer nonlinear programming (MINLP)
+    solver = pywraplp.Solver.CreateSolver('SCIP')
     if not solver:
         raise ValueError("Solver creation failed. Ensure that OR-Tools is properly installed.")
 
@@ -170,8 +59,9 @@ def optimize_packages(data, carry_capacity, carry_volume):
     solver.Add(solver.Sum(data.loc[i, 'WEIGHT_TONS'] * x[i] for i in range(num_packages)) <= carry_capacity)
     solver.Add(solver.Sum(data.loc[i, 'CBM'] * x[i] for i in range(num_packages)) <= carry_volume)
 
+    # Maximize total weight and volume (simple objective without priority dates)
     objective = solver.Sum(
-        (data.loc[i, 'WEIGHT_TONS'] + data.loc[i, 'CBM']) / max(1, data.loc[i, 'DAYS_REMAINING']) * x[i]
+        (data.loc[i, 'WEIGHT_TONS'] + data.loc[i, 'CBM']) * x[i]
         for i in range(num_packages)
     )
     solver.Maximize(objective)
@@ -187,7 +77,7 @@ def optimize_packages(data, carry_capacity, carry_volume):
         raise ValueError("The solver did not find an optimal solution.")
 
 # Function to create packages based on optimized selection
-def create_packages(data, carry_capacity, carry_volume, include_cost=True, dcd_upper_limit=58):
+def create_packages(data, carry_capacity, carry_volume, include_cost=True, max_weight=24):
     packages = []
     unfulfilled_due_to_volume = pd.DataFrame()
 
@@ -197,17 +87,15 @@ def create_packages(data, carry_capacity, carry_volume, include_cost=True, dcd_u
             break
 
         selected_data = data.iloc[selected_packages]
-        job_nos = selected_data[find_job_no_column(data)].tolist()
-        days_remaining = selected_data['DAYS_REMAINING'].tolist()
-        total_cost = calculate_cost(total_weight_used, total_volume_used, dcd_upper_limit) if include_cost else None
+        total_cost = calculate_cost(total_weight_used, total_volume_used, max_weight) if include_cost else None
 
-        if (not (
-                (4.5 <= total_weight_used <= 6) or
-                (7 <= total_weight_used <= 9) or
-                (10 <= total_weight_used <= 15) or
-                (16 <= total_weight_used <= 18) or
-                (20 <= total_weight_used <= 24)
-            )) or total_cost == 0:
+        if not (
+            (4.5 <= total_weight_used <= 6) or
+            (7 <= total_weight_used <= 9) or
+            (10 <= total_weight_used <= 15) or
+            (16 <= total_weight_used <= 18) or
+            (20 <= total_weight_used <= 24)
+        ) or total_cost == 0:
             unfulfilled_due_to_volume = pd.concat([unfulfilled_due_to_volume, selected_data])
         else:
             # Include all columns from the selected data
@@ -226,7 +114,7 @@ def create_packages(data, carry_capacity, carry_volume, include_cost=True, dcd_u
     return packages, unfulfilled_due_to_volume
 
 # Recursive function to create packages for all weight classes and split larger ones
-def create_packages_recursive(data, weight_range, carry_volume, include_cost, dcd_upper_limit):
+def create_packages_recursive(data, weight_range, carry_volume, include_cost, max_weight):
     packages = []
     unfulfilled_packages = pd.DataFrame()
 
@@ -238,67 +126,65 @@ def create_packages_recursive(data, weight_range, carry_volume, include_cost, dc
             break
 
         selected_data = data.iloc[selected_packages]
-        job_nos = selected_data[find_job_no_column(data)].tolist()
-        total_cost = calculate_cost(total_weight_used, total_volume_used, dcd_upper_limit) if include_cost else None
+        total_cost = calculate_cost(total_weight_used, total_volume_used, max_weight) if include_cost else None
 
         # Check if weight can be split
         if total_weight_used == 15:
             packages.append({
-                'Job Nos': job_nos,
+                'Job Nos': selected_data['id'].tolist(),
                 'Total Weight': 9,
-                'Total Volume': total_volume_used * (9 / 15),  # Split volume proportionally
-                'Total Cost': calculate_cost(9, total_volume_used * (9 / 15), dcd_upper_limit) if include_cost else None
+                'Total Volume': total_volume_used * (9 / 15),
+                'Total Cost': calculate_cost(9, total_volume_used * (9 / 15), max_weight) if include_cost else None
             })
             packages.append({
-                'Job Nos': job_nos,
+                'Job Nos': selected_data['id'].tolist(),
                 'Total Weight': 6,
-                'Total Volume': total_volume_used * (6 / 15),  # Split volume proportionally
-                'Total Cost': calculate_cost(6, total_volume_used * (6 / 15), dcd_upper_limit) if include_cost else None
+                'Total Volume': total_volume_used * (6 / 15),
+                'Total Cost': calculate_cost(6, total_volume_used * (6 / 15), max_weight) if include_cost else None
             })
         elif total_weight_used == 18:
             packages.append({
-                'Job Nos': job_nos,
+                'Job Nos': selected_data['id'].tolist(),
                 'Total Weight': 15,
-                'Total Volume': total_volume_used * (15 / 18),  # Split volume proportionally
-                'Total Cost': calculate_cost(15, total_volume_used * (15 / 18), dcd_upper_limit) if include_cost else None
+                'Total Volume': total_volume_used * (15 / 18),
+                'Total Cost': calculate_cost(15, total_volume_used * (15 / 18), max_weight) if include_cost else None
             })
             packages.append({
-                'Job Nos': job_nos,
+                'Job Nos': selected_data['id'].tolist(),
                 'Total Weight': 6,
-                'Total Volume': total_volume_used * (6 / 18),  # Split volume proportionally
-                'Total Cost': calculate_cost(6, total_volume_used * (6 / 18), dcd_upper_limit) if include_cost else None
+                'Total Volume': total_volume_used * (6 / 18),
+                'Total Cost': calculate_cost(6, total_volume_used * (6 / 18), max_weight) if include_cost else None
             })
             packages.append({
-                'Job Nos': job_nos,
+                'Job Nos': selected_data['id'].tolist(),
                 'Total Weight': 9,
-                'Total Volume': total_volume_used * (9 / 18),  # Split volume proportionally
-                'Total Cost': calculate_cost(9, total_volume_used * (9 / 18), dcd_upper_limit) if include_cost else None
+                'Total Volume': total_volume_used * (9 / 18),
+                'Total Cost': calculate_cost(9, total_volume_used * (9 / 18), max_weight) if include_cost else None
             })
-
         elif total_weight_used == 24:
             packages.append({
-                'Job Nos': job_nos,
+                'Job Nos': selected_data['id'].tolist(),
                 'Total Weight': 18,
-                'Total Volume': total_volume_used * (18 / 24),  # Split volume proportionally
-                'Total Cost': calculate_cost(18, total_volume_used * (18 / 24), dcd_upper_limit) if include_cost else None
+                'Total Volume': total_volume_used * (18 / 24),
+                'Total Cost': calculate_cost(18, total_volume_used * (18 / 24), max_weight) if include_cost else None
             })
             packages.append({
-                'Job Nos': job_nos,
+                'Job Nos': selected_data['id'].tolist(),
                 'Total Weight': 15,
-                'Total Volume': total_volume_used * (15 / 24),  # Split volume proportionally
-                'Total Cost': calculate_cost(15, total_volume_used * (15 / 24), dcd_upper_limit) if include_cost else None
+                'Total Volume': total_volume_used * (15 / 24),
+                'Total Cost': calculate_cost(15, total_volume_used * (15 / 24), max_weight) if include_cost else None
             })
             packages.append({
-                'Job Nos': job_nos,
+                'Job Nos': selected_data['id'].tolist(),
                 'Total Weight': 6,
-                'Total Volume': total_volume_used * (6 / 24),  # Split volume proportionally
-                'Total Cost': calculate_cost(6, total_volume_used * (6 / 24), dcd_upper_limit) if include_cost else None
+                'Total Volume': total_volume_used * (6 / 24),
+                'Total Cost': calculate_cost(6, total_volume_used * (6 / 24), max_weight) if include_cost else None
             })
             packages.append({
-                'Job Nos': job_nos,
+                'Job Nos': selected_data['id'].tolist(),
                 'Total Weight': 9,
-                'Total Volume': total_volume_used * (9 / 24),  # Split volume proportionally
-                'Total Cost': calculate_cost(9, total_volume_used * (9 / 24), dcd_upper_limit) if include_cost else None
+                'Total Volume': total_volume_used * (9 / 24),
+                'Total Cost': calculate_cost(9, total_volume_used * (9 / 24), max_weight) if include_cost else None
             })
         elif not (
             (4.5 <= total_weight_used <= 6) or
@@ -310,7 +196,7 @@ def create_packages_recursive(data, weight_range, carry_volume, include_cost, dc
             unfulfilled_packages = pd.concat([unfulfilled_packages, selected_data])
         else:
             packages.append({
-                'Job Nos': job_nos,
+                'Job Nos': selected_data['id'].tolist(),
                 'Total Weight': total_weight_used,
                 'Total Volume': total_volume_used,
                 'Total Cost': total_cost
@@ -321,14 +207,14 @@ def create_packages_recursive(data, weight_range, carry_volume, include_cost, dc
     # Handle smaller weight classes recursively
     for lower_weight_class in [(4.5, 6), (7, 9), (10, 15), (16, 18), (20, 24)]:
         if lower_weight_class[-1] < weight_range[-1]:
-            sub_packages, sub_unfulfilled = create_packages_recursive(data, lower_weight_class, carry_volume, include_cost, dcd_upper_limit)
+            sub_packages, sub_unfulfilled = create_packages_recursive(data, lower_weight_class, carry_volume, include_cost, max_weight)
             packages.extend(sub_packages)
             unfulfilled_packages = pd.concat([unfulfilled_packages, sub_unfulfilled])
 
     return packages, unfulfilled_packages
 
 # Function to analyze weight classes and generate a report based on unfulfilled jobs
-def analyze_weight_classes(data, dcd_upper_limit, include_cost=True):
+def analyze_weight_classes(data, container_volume, include_cost=True, max_weight=24):
     fulfilled_files = {}
     unfulfilled_files = []
 
@@ -340,20 +226,18 @@ def analyze_weight_classes(data, dcd_upper_limit, include_cost=True):
         '24 Tones': [20, 24]
     }
 
-    volume_class = get_volume_class('DCD', dcd_upper_limit)  # Assuming the user selects DCD
-
     best_class = None
     best_unfulfilled_count = float('inf')
     best_cost = float('inf')
 
     for weight_class, weight_range in weight_class_ranges.items():
-        packages, unfulfilled_packages = create_packages(data.copy(), weight_range[-1], volume_class, include_cost, dcd_upper_limit)
+        packages, unfulfilled_packages = create_packages(data.copy(), weight_range[-1], container_volume, include_cost, max_weight)
 
         # Store fulfilled packages by weight class
         fulfilled_files[weight_class] = packages
         unfulfilled_count = len(unfulfilled_packages)
         total_unfulfilled_weight = round(unfulfilled_packages['WEIGHT_TONS'].sum(), 2) if not unfulfilled_packages.empty else 0
-        total_unfulfilled_cost = calculate_cost(total_unfulfilled_weight, 0, dcd_upper_limit)  # Fixed line
+        total_unfulfilled_cost = calculate_cost(total_unfulfilled_weight, 0, max_weight)
 
         if unfulfilled_count < best_unfulfilled_count or (unfulfilled_count == best_unfulfilled_count and total_unfulfilled_cost < best_cost):
             best_class = weight_class

@@ -3,3 +3,5 @@ ortools
 numpy
 pandas
 openpyxl
+django-mssql-backend
+pyodbc
