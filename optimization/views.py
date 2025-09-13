@@ -88,7 +88,7 @@ def upload_view(request):
                         if weight_class == best_class:
                             for pkg in packages:
                                 best_packages.append({
-                                    'console_data_html': pkg['Console Data'].to_html(index=False, classes='table table-striped table-bordered'),
+                                    'console_data_html': pkg['Console Data'].to_html(index=False, classes='min-w-full table-auto border-collapse border border-gray-300 text-sm'),
                                     'total_weight': pkg['Total Weight'],
                                     'total_volume': pkg['Total Volume'],
                                     'total_cost': pkg['Total Cost']
@@ -102,7 +102,7 @@ def upload_view(request):
                     if wc == best_class:
                         unfulfilled_best.append({
                             'weight_class': wc,
-                            'data_html': unfulfilled.to_html(index=False, classes='table table-striped table-bordered') if not unfulfilled.empty else '<p>No unfulfilled packages.</p>'
+                            'data_html': unfulfilled.to_html(index=False, classes='min-w-full table-auto border-collapse border border-gray-300 text-sm') if not unfulfilled.empty else '<p>No unfulfilled packages.</p>'
                         })
 
                 # All fulfilled
@@ -112,7 +112,7 @@ def upload_view(request):
                         all_fulfilled.append({
                             'package_idx': idx + 1,
                             'weight_class': weight_class,
-                            'console_data_html': pkg['Console Data'].to_html(index=False, classes='table table-striped table-bordered'),
+                            'console_data_html': pkg['Console Data'].to_html(index=False, classes='min-w-full table-auto border-collapse border border-gray-300 text-sm'),
                             'total_weight': pkg['Total Weight'],
                             'total_volume': pkg['Total Volume'],
                             'total_cost': pkg['Total Cost']
@@ -123,7 +123,7 @@ def upload_view(request):
                 for weight_class, unfulfilled in unfulfilled_files:
                     all_unfulfilled.append({
                         'weight_class': weight_class,
-                        'data_html': unfulfilled.to_html(index=False, classes='table table-striped table-bordered') if not unfulfilled.empty else '<p>No unfulfilled packages.</p>'
+                        'data_html': unfulfilled.to_html(index=False, classes='min-w-full table-auto border-collapse border border-gray-300 text-sm') if not unfulfilled.empty else '<p>No unfulfilled packages.</p>'
                     })
 
                 # Comparative report
@@ -151,7 +151,7 @@ def upload_view(request):
                     })
 
                 comparative_df = pd.DataFrame(comparative_data)
-                comparative_html = comparative_df.to_html(index=False, classes='table table-striped table-bordered')
+                comparative_html = comparative_df.to_html(index=False, classes='min-w-full table-auto border-collapse border border-gray-300 text-sm')
 
                 # Create container names string for display
                 container_names = [f"{c.name} - {c.size}" for c in containers]
