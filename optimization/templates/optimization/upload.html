@@ -8,6 +8,8 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <!-- Select2 JS -->
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 {% endblock %}
@@ -152,13 +154,23 @@
         <p>© 2024 Container Optimization Tool. Built with Django & Tailwind.</p>
     </div>
 
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Select2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
     <script>
         $(document).ready(function() {
+            // Clear initial options from form
+            $('#id_container_size').empty();
+
             // Initialize Select2 for container size multi-select
-            $('#container_size').select2({
+            $('#id_container_size').select2({
                 placeholder: 'Search and select container sizes...',
                 allowClear: true,
-                width: '100%'
+                width: '100%',
+                multiple: true,
+                minimumResultsForSearch: 0
             });
 
             // Search functionality
@@ -208,7 +220,8 @@
             document.querySelectorAll('input[name="container_type"]').forEach(radio => {
                 radio.addEventListener('change', function() {
                     const containerType = this.value;
-                    const sizeSelect = $('#container_size');
+                    const categorytypeid = containerType === 'console' ? 7 : 8;
+                    const sizeSelect = $('#id_container_size');
 
                     // Clear current options
                     sizeSelect.empty();
@@ -216,7 +229,7 @@
                     if (containerType) {
                         // Fetch container sizes from server
                         $.ajax({
-                            url: '/get_container_sizes/' + containerType + '/',
+                            url: '/get_container_sizes/' + categorytypeid + '/',
                             type: 'GET',
                             success: function(data) {
                                 if (data.sizes) {
@@ -246,7 +259,7 @@
             });
 
             // Container size change handler (for Select2)
-            $('#container_size').on('change', function() {
+            $('#id_container_size').on('change', function() {
                 const selectedSizes = $(this).val();
                 const containerType = document.querySelector('input[name="container_type"]:checked')?.value;
 

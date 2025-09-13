@@ -187,14 +187,7 @@ def upload_view(request):
     return render(request, 'optimization/upload.html', context)
 
 
-def get_container_sizes(request, container_type):
-    if container_type == 'console':
-        categorytypeid = 7
-    elif container_type == 'closed_body_truck':
-        categorytypeid = 8
-    else:
-        return JsonResponse({'error': 'Invalid container type'}, status=400)
-
+def get_container_sizes(request, categorytypeid):
     containers = Containertypes.objects.filter(categorytypeid=categorytypeid)
     sizes = [f"{c.name} - {c.size}" for c in containers]
     return JsonResponse({'sizes': sizes})

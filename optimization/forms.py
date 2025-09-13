@@ -14,7 +14,7 @@ class UploadForm(forms.Form):
     container_size = forms.MultipleChoiceField(
         choices=[],
         label='Select Container Size (Multi-select)',
-        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'id': 'container_size', 'multiple': 'multiple'})
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'id': 'id_container_size', 'multiple': 'multiple'})
     )
 
     # Dimensions selection will be handled via checkboxes in template
