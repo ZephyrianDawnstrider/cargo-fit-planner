@@ -5,13 +5,231 @@
 {% block extra_head %}
 <!-- Select2 CSS -->
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-{% endblock %}
-
-{% block extra_js %}
 <!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <!-- Select2 JS -->
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* General container */
+    .select2-container--default .select2-selection--multiple {
+        background-color: #fff;
+        border: 1px solid #d1d5db; /* gray-300 */
+        border-radius: 0.375rem; /* rounded-md */
+        padding: 0.5rem;
+        min-height: 42px;
+    }
+    body.dark .select2-container--default .select2-selection--multiple {
+        background-color: #374151; /* gray-700 */
+        border-color: #4b5563; /* gray-600 */
+    }
+
+    /* Selected choice */
+    .select2-container--default .select2-selection--multiple .select2-selection__choice {
+        background-color: #3b82f6; /* blue-500 */
+        border: 1px solid #2563eb; /* blue-600 */
+        color: #fff;
+        border-radius: 0.25rem; /* rounded-sm */
+        padding: 0.25rem 0.5rem;
+        margin-right: 0.5rem;
+    }
+    body.dark .select2-container--default .select2-selection--multiple .select2-selection__choice {
+        background-color: #1d4ed8; /* blue-700 */
+        border-color: #1e40af; /* blue-800 */
+    }
+
+    /* Remove button on choice */
+    .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+        color: #fff;
+        margin-right: 0.25rem;
+    }
+    .select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
+        color: #eff6ff; /* blue-50 */
+    }
+
+    /* Search field */
+    .select2-container--default .select2-search--inline .select2-search__field {
+        color: #111827; /* gray-900 */
+    }
+    body.dark .select2-container--default .select2-search--inline .select2-search__field {
+        color: #fff;
+    }
+
+    /* Dropdown panel */
+    .select2-dropdown {
+        background-color: #fff;
+        border: 1px solid #d1d5db; /* gray-300 */
+        border-radius: 0.375rem; /* rounded-md */
+    }
+    body.dark .select2-dropdown {
+        background-color: #374151; /* gray-700 */
+        border-color: #4b5563; /* gray-600 */
+    }
+
+    /* Dropdown search field */
+    .select2-container--default .select2-search--dropdown .select2-search__field {
+        background-color: #f9fafb; /* gray-50 */
+        border: 1px solid #d1d5db; /* gray-300 */
+        color: #111827; /* gray-900 */
+    }
+    body.dark .select2-container--default .select2-search--dropdown .select2-search__field {
+        background-color: #4b5563; /* gray-600 */
+        border-color: #6b7280; /* gray-500 */
+        color: #fff;
+    }
+
+    /* Option in dropdown */
+    .select2-results__option {
+        color: #111827; /* gray-900 */
+    }
+    body.dark .select2-results__option {
+        color: #fff;
+    }
+
+    /* Highlighted option */
+    .select2-results__option--highlighted[aria-selected] {
+        background-color: #3b82f6; /* blue-500 */
+        color: #fff;
+    }
+    body.dark .select2-results__option--highlighted[aria-selected] {
+        background-color: #2563eb; /* blue-600 */
+    }
+    /* Extra polish for Select2 dropdown */
+    .tailwind-select2 .select2-results__option {
+        padding: 0.75rem;
+        font-size: 0.95rem;
+    }
+    .tailwind-select2 .select2-results__option--highlighted {
+        background: linear-gradient(to right, #3b82f6, #9333ea);
+        color: white;
+    }
+    .tailwind-select2 .select2-results__option--highlighted:hover {
+        background: linear-gradient(to right, #2563eb, #7e22ce);
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Clear initial options from form
+        $('#id_container_size').empty();
+
+        // Initialize Select2 for container size multi-select
+        $('#id_container_size').select2({
+            placeholder: 'Search and select container sizes...',
+            allowClear: true,
+            width: '100%',
+            multiple: true,
+            minimumResultsForSearch: 0, // always show search box
+            dropdownCssClass: "tailwind-select2"
+        });
+
+        // Search functionality for cargo items
+        document.getElementById('search').addEventListener('input', function() {
+            const query = this.value.toLowerCase();
+            const rows = document.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const id = row.cells[2].textContent.toLowerCase();
+                const packageType = row.cells[3].textContent.toLowerCase();
+                if (id.includes(query) || packageType.includes(query)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+
+        // Update selected count
+        function updateSelectedCount() {
+            const selected = document.querySelectorAll('.dimension-checkbox:checked').length;
+            const total = {{ dimensions|length }};
+            document.getElementById('selected-count').textContent = selected + ' of ' + total + ' items selected';
+        }
+
+        // Select all checkboxes functionality
+        document.getElementById('select-all').addEventListener('change', function() {
+            const checkboxes = document.querySelectorAll('.dimension-checkbox');
+            checkboxes.forEach(cb => cb.checked = this.checked);
+            updateSelectedDimensions();
+            updateSelectedCount();
+        });
+
+        // Update selected dimensions on checkbox change
+        document.querySelectorAll('.dimension-checkbox').forEach(cb => {
+            cb.addEventListener('change', function() {
+                updateSelectedDimensions();
+                updateSelectedCount();
+            });
+        });
+
+        function updateSelectedDimensions() {
+            const selected = Array.from(document.querySelectorAll('.dimension-checkbox:checked')).map(cb => cb.value);
+            document.getElementById('id_selected_dimensions').value = selected.join(',');
+        }
+
+        // Container type change handler (Console → categorytypeid=7, Closed Body Truck → categorytypeid=8)
+        document.querySelectorAll('input[name="container_type"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const containerType = this.value;
+                const categorytypeid = containerType === 'console' ? 7 : 8;
+                const sizeSelect = $('#id_container_size');
+
+                // Clear current options
+                sizeSelect.empty();
+
+                if (containerType) {
+                    // Fetch container sizes from server
+                    $.ajax({
+                        url: '/get_container_sizes/' + categorytypeid + '/',
+                        type: 'GET',
+                        success: function(data) {
+                            if (data.sizes) {
+                                data.sizes.forEach(size => {
+                                    const option = new Option(size, size, false, false);
+                                    sizeSelect.append(option);
+                                });
+                                sizeSelect.trigger('change'); // refresh Select2
+                            }
+                        },
+                        error: function() {
+                            alert('Error loading container sizes.');
+                        }
+                    });
+                }
+            });
+        });
+
+        // Form submit handler for loading spinner
+        document.getElementById('stuffing-form').addEventListener('submit', function() {
+            const submitBtn = document.getElementById('submit-btn');
+            const spinner = document.getElementById('loading-spinner');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<svg class="animate-spin w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...';
+            spinner.classList.remove('hidden');
+        });
+
+        // Container size change handler (for Select2)
+        $('#id_container_size').on('change', function() {
+            const selectedSizes = $(this).val();
+            const containerType = document.querySelector('input[name="container_type"]:checked')?.value;
+
+            if (containerType && selectedSizes && selectedSizes.length > 0) {
+                // Show container info (placeholder values for demo)
+                document.getElementById('container-info').style.display = 'block';
+                const totalMaxWeight = selectedSizes.length * 24.0; // Example calculation
+                const totalVolume = selectedSizes.length * 33.2; // Example calculation
+                document.getElementById('max-weight').textContent = totalMaxWeight.toFixed(1);
+                document.getElementById('container-volume').textContent = totalVolume.toFixed(1);
+            } else {
+                document.getElementById('container-info').style.display = 'none';
+            }
+        });
+    });
+</script>
 {% endblock %}
 
 {% block content %}
@@ -154,128 +372,4 @@
         <p>© 2024 Container Optimization Tool. Built with Django & Tailwind.</p>
     </div>
 
-    <!-- jQuery -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <!-- Select2 JS -->
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-
-    <script>
-        $(document).ready(function() {
-            // Clear initial options from form
-            $('#id_container_size').empty();
-
-            // Initialize Select2 for container size multi-select
-            $('#id_container_size').select2({
-                placeholder: 'Search and select container sizes...',
-                allowClear: true,
-                width: '100%',
-                multiple: true,
-                minimumResultsForSearch: 0
-            });
-
-            // Search functionality
-            document.getElementById('search').addEventListener('input', function() {
-                const query = this.value.toLowerCase();
-                const rows = document.querySelectorAll('tbody tr');
-                rows.forEach(row => {
-                    const id = row.cells[2].textContent.toLowerCase();
-                    const packageType = row.cells[3].textContent.toLowerCase();
-                    if (id.includes(query) || packageType.includes(query)) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
-                    }
-                });
-            });
-
-            // Update selected count
-            function updateSelectedCount() {
-                const selected = document.querySelectorAll('.dimension-checkbox:checked').length;
-                const total = {{ dimensions|length }};
-                document.getElementById('selected-count').textContent = selected + ' of ' + total + ' items selected';
-            }
-
-            // Select all checkboxes functionality
-            document.getElementById('select-all').addEventListener('change', function() {
-                const checkboxes = document.querySelectorAll('.dimension-checkbox');
-                checkboxes.forEach(cb => cb.checked = this.checked);
-                updateSelectedDimensions();
-                updateSelectedCount();
-            });
-
-            // Update selected dimensions on checkbox change
-            document.querySelectorAll('.dimension-checkbox').forEach(cb => {
-                cb.addEventListener('change', function() {
-                    updateSelectedDimensions();
-                    updateSelectedCount();
-                });
-            });
-
-            function updateSelectedDimensions() {
-                const selected = Array.from(document.querySelectorAll('.dimension-checkbox:checked')).map(cb => cb.value);
-                document.getElementById('id_selected_dimensions').value = selected.join(',');
-            }
-
-            // Container type change handler
-            document.querySelectorAll('input[name="container_type"]').forEach(radio => {
-                radio.addEventListener('change', function() {
-                    const containerType = this.value;
-                    const categorytypeid = containerType === 'console' ? 7 : 8;
-                    const sizeSelect = $('#id_container_size');
-
-                    // Clear current options
-                    sizeSelect.empty();
-
-                    if (containerType) {
-                        // Fetch container sizes from server
-                        $.ajax({
-                            url: '/get_container_sizes/' + categorytypeid + '/',
-                            type: 'GET',
-                            success: function(data) {
-                                if (data.sizes) {
-                                    data.sizes.forEach(size => {
-                                        const option = new Option(size, size, false, false);
-                                        sizeSelect.append(option);
-                                    });
-                                    // Trigger change to refresh Select2
-                                    sizeSelect.trigger('change');
-                                }
-                            },
-                            error: function() {
-                                alert('Error loading container sizes.');
-                            }
-                        });
-                    }
-                });
-            });
-
-            // Form submit handler for loading spinner
-            document.getElementById('stuffing-form').addEventListener('submit', function() {
-                const submitBtn = document.getElementById('submit-btn');
-                const spinner = document.getElementById('loading-spinner');
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<svg class="animate-spin w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...';
-                spinner.classList.remove('hidden');
-            });
-
-            // Container size change handler (for Select2)
-            $('#id_container_size').on('change', function() {
-                const selectedSizes = $(this).val();
-                const containerType = document.querySelector('input[name="container_type"]:checked')?.value;
-
-                if (containerType && selectedSizes && selectedSizes.length > 0) {
-                    // Show container info (this would be populated with actual data)
-                    document.getElementById('container-info').style.display = 'block';
-                    // Placeholder values - would be replaced with actual container data
-                    // For multiple selections, show combined info
-                    const totalMaxWeight = selectedSizes.length * 24.0; // Example calculation
-                    const totalVolume = selectedSizes.length * 33.2; // Example calculation
-                    document.getElementById('max-weight').textContent = totalMaxWeight.toFixed(1);
-                    document.getElementById('container-volume').textContent = totalVolume.toFixed(1);
-                } else {
-                    document.getElementById('container-info').style.display = 'none';
-                }
-            });
-        });
-    </script>
 {% endblock %}

@@ -12,6 +12,8 @@
         .dark { background-color: #1f2937; color: #f9fafb; }
         .transition-all { transition: all 0.3s ease; }
     </style>
+    {% block extra_head %}{% endblock %}
+    {% block extra_css %}{% endblock %}
 </head>
 <body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 transition-all">
     <nav class="bg-white dark:bg-gray-800 shadow-lg sticky top-0 z-50">
@@ -36,6 +38,7 @@
         </div>
     </nav>
     {% block content %}{% endblock %}
+    {% block extra_js %}{% endblock %}
     <script>
         const toggle = document.getElementById('dark-mode-toggle');
         toggle.addEventListener('click', () => {
