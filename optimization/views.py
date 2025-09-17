@@ -140,8 +140,20 @@ def upload_view(request):
                             create_3d_model(float(cont['container'].length_m), float(cont['container'].breadth_m), float(cont['container'].height_m), cont['items'], output_path)
                             model_images.append(f'optimization/3d_model_{scenario_idx}_{i}.html')
 
+                        # Calculate summary
+                        total_weight_used = sum(c['total_weight'] for c in containers_used)
+                        total_volume_used = sum(c['total_volume'] for c in containers_used)
+                        num_containers = len(containers_used)
+                        num_remaining = len(remaining_data)
+                        total_max_weight = num_containers * (float(container.maxpayload_kg) / 1000) if container.maxpayload_kg else 0
+                        total_max_volume = num_containers * float(container.volume_cbm) if container.volume_cbm else 0
+                        weight_util = (total_weight_used / total_max_weight) * 100 if total_max_weight > 0 else 0
+                        volume_util = (total_volume_used / total_max_volume) * 100 if total_max_volume > 0 else 0
+
+                        summary_name = f"{scenario_name}: {num_containers} containers, {weight_util:.1f}% weight, {volume_util:.1f}% volume, {num_remaining} remaining"
+
                         scenarios.append({
-                            'name': scenario_name,
+                            'name': summary_name,
                             'containers_used': containers_used,
                             'remaining_items': remaining_data.to_dict('records') if not remaining_data.empty else [],
                             'model_images': model_images
