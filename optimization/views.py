@@ -60,8 +60,9 @@ def upload_view(request):
                 if not containers:
                     return render(request, 'optimization/upload.html', {'form': form, 'error': 'No valid containers found.'})
 
-                # Sort containers by volume ascending to prefer smaller ones
-                containers.sort(key=lambda c: float(c.volume_cbm))
+                # Check if all container sizes for the category are selected
+                total_sizes = Containertypes.objects.filter(categorytypeid=categorytypeid).count()
+                all_selected = len(container_sizes) == total_sizes
 
                 # Get selected dimensions
                 if selected_dimensions_ids:
@@ -104,45 +105,96 @@ def upload_view(request):
                 selected_data_expanded = pd.DataFrame(selected_data_expanded)
                 logger.info(f"Expanded data to {len(selected_data_expanded)} individual items from {len(selected_data)} selected records.")
 
-                # Pack into containers
-                containers_used = []
-                remaining_data = selected_data_expanded.copy()
-                logger.info(f"Starting packing with {len(remaining_data)} items into {len(containers)} container types.")
-                for container in containers:
-                    container_count = 0
-                    while not remaining_data.empty:
-                        selected_indices, total_weight, total_volume = optimize_packages(remaining_data, float(container.maxpayload_kg) / 1000, float(container.volume_cbm))
-                        if not selected_indices:
-                            break
-                        selected_items = remaining_data.iloc[selected_indices]
-                        container_count += 1
-                        containers_used.append({
-                            'container': container,
-                            'container_number': container_count,
-                            'items': selected_items.to_dict('records'),
-                            'total_weight': total_weight,
-                            'total_volume': total_volume
-                        })
-                        logger.info(f"Packed container {container.name} - {container.size} instance {container_count} with {len(selected_items)} items, weight {total_weight:.2f} tons, volume {total_volume:.2f} CBM.")
-                        remaining_data = remaining_data.drop(selected_indices).reset_index(drop=True)
-                logger.info(f"Packing complete. Used {len(containers_used)} containers. Remaining items: {len(remaining_data)}.")
+                scenarios = []
+                if all_selected:
+                    # Create one scenario per container size
+                    for scenario_idx, container in enumerate(containers):
+                        scenario_name = f"{container.name} - {container.size}"
+                        # Pack into this container type only
+                        containers_used = []
+                        remaining_data = selected_data_expanded.copy()
+                        logger.info(f"Starting scenario '{scenario_name}' with {len(remaining_data)} items into {container.name} - {container.size}.")
+                        container_count = 0
+                        while not remaining_data.empty:
+                            selected_indices, total_weight, total_volume = optimize_packages(remaining_data, float(container.maxpayload_kg) / 1000, float(container.volume_cbm))
+                            if not selected_indices:
+                                break
+                            selected_items = remaining_data.iloc[selected_indices]
+                            container_count += 1
+                            containers_used.append({
+                                'container': container,
+                                'container_number': container_count,
+                                'items': selected_items.to_dict('records'),
+                                'total_weight': total_weight,
+                                'total_volume': total_volume
+                            })
+                            logger.info(f"Packed container {container.name} - {container.size} instance {container_count} with {len(selected_items)} items, weight {total_weight:.2f} tons, volume {total_volume:.2f} CBM.")
+                            remaining_data = remaining_data.drop(selected_indices).reset_index(drop=True)
+                        logger.info(f"Scenario '{scenario_name}' complete. Used {len(containers_used)} containers. Remaining items: {len(remaining_data)}.")
 
-                # Create 3D models for each used container
-                model_images = []
-                for i, cont in enumerate(containers_used):
-                    output_path = f'optimization/static/optimization/3d_model_{i}.html'
-                    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                    create_3d_model(float(cont['container'].length_m), float(cont['container'].breadth_m), float(cont['container'].height_m), cont['items'], output_path)
-                    model_images.append(f'optimization/3d_model_{i}.html')
+                        # Create 3D models for each used container
+                        model_images = []
+                        for i, cont in enumerate(containers_used):
+                            output_path = f'optimization/static/optimization/3d_model_{scenario_idx}_{i}.html'
+                            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                            create_3d_model(float(cont['container'].length_m), float(cont['container'].breadth_m), float(cont['container'].height_m), cont['items'], output_path)
+                            model_images.append(f'optimization/3d_model_{scenario_idx}_{i}.html')
+
+                        scenarios.append({
+                            'name': scenario_name,
+                            'containers_used': containers_used,
+                            'remaining_items': remaining_data.to_dict('records') if not remaining_data.empty else [],
+                            'model_images': model_images
+                        })
+                else:
+                    # Single scenario with selected containers
+                    scenario_name = 'Selected Containers'
+                    sorted_containers = sorted(containers, key=lambda c: float(c.volume_cbm))
+
+                    # Pack into containers
+                    containers_used = []
+                    remaining_data = selected_data_expanded.copy()
+                    logger.info(f"Starting scenario '{scenario_name}' with {len(remaining_data)} items into {len(sorted_containers)} container types.")
+                    for container in sorted_containers:
+                        container_count = 0
+                        while not remaining_data.empty:
+                            selected_indices, total_weight, total_volume = optimize_packages(remaining_data, float(container.maxpayload_kg) / 1000, float(container.volume_cbm))
+                            if not selected_indices:
+                                break
+                            selected_items = remaining_data.iloc[selected_indices]
+                            container_count += 1
+                            containers_used.append({
+                                'container': container,
+                                'container_number': container_count,
+                                'items': selected_items.to_dict('records'),
+                                'total_weight': total_weight,
+                                'total_volume': total_volume
+                            })
+                            logger.info(f"Packed container {container.name} - {container.size} instance {container_count} with {len(selected_items)} items, weight {total_weight:.2f} tons, volume {total_volume:.2f} CBM.")
+                            remaining_data = remaining_data.drop(selected_indices).reset_index(drop=True)
+                    logger.info(f"Scenario '{scenario_name}' complete. Used {len(containers_used)} containers. Remaining items: {len(remaining_data)}.")
+
+                    # Create 3D models for each used container
+                    model_images = []
+                    for i, cont in enumerate(containers_used):
+                        output_path = f'optimization/static/optimization/3d_model_0_{i}.html'
+                        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                        create_3d_model(float(cont['container'].length_m), float(cont['container'].breadth_m), float(cont['container'].height_m), cont['items'], output_path)
+                        model_images.append(f'optimization/3d_model_0_{i}.html')
+
+                    scenarios.append({
+                        'name': scenario_name,
+                        'containers_used': containers_used,
+                        'remaining_items': remaining_data.to_dict('records') if not remaining_data.empty else [],
+                        'model_images': model_images
+                    })
 
                 # Create container names string for display
                 container_names = [f"{c.name} - {c.size}" for c in containers]
                 selected_containers_str = ", ".join(container_names)
 
                 context = {
-                    'containers_used': containers_used,
-                    'remaining_items': remaining_data.to_dict('records') if not remaining_data.empty else [],
-                    'model_images': model_images,
+                    'scenarios': scenarios,
                     'selected_container': selected_containers_str,
                     'max_weight': total_max_weight,
                     'container_volume': total_volume

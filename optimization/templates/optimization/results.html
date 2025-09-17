@@ -10,90 +10,96 @@
             <p class="text-lg text-gray-600 dark:text-gray-300">Visualization of packed items in containers</p>
         </div>
 
-        <div class="bg-white dark:bg-gray-800 shadow rounded p-6 mb-6">
-            <h2 class="text-2xl font-semibold mb-4 border-b pb-2">Packed Containers</h2>
-            {% for container in containers_used %}
-                <div class="bg-gray-50 dark:bg-gray-700 rounded p-4 mb-4">
-                    <h3 class="text-xl font-medium mb-2">Container {{ forloop.counter }}: {{ container.container.name }} - {{ container.container.size }} (Instance {{ container.container_number }})</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <p><strong>Total Weight Used:</strong> {{ container.total_weight|floatformat:2 }} tons</p>
-                        <p><strong>Total Volume Used:</strong> {{ container.total_volume|floatformat:2 }} CBM</p>
-                    </div>
-                    <div class="overflow-auto max-h-96">
-                        <table class="min-w-full table-auto border-collapse border border-gray-300 text-sm">
-                            <thead class="bg-gray-800 text-white">
-                                <tr>
-                                    <th class="border border-gray-300 px-4 py-2">Query ID</th>
-                                    <th class="border border-gray-300 px-4 py-2">ID</th>
-                                    <th class="border border-gray-300 px-4 py-2">Package Type</th>
-                                    <th class="border border-gray-300 px-4 py-2">Cargo Type</th>
-                                    <th class="border border-gray-300 px-4 py-2">Dimensions (L×W×H)</th>
-                                    <th class="border border-gray-300 px-4 py-2">Weight (tons)</th>
-                                    <th class="border border-gray-300 px-4 py-2">Volume (CBM)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in container.items %}
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-600" data-queryid="{{ item.queryid }}" data-id="{{ item.id }}">
-                                    <td class="border border-gray-300 px-4 py-2">{{ item.queryid }}</td>
-                                    <td class="border border-gray-300 px-4 py-2">{{ item.id }}</td>
-                                    <td class="border border-gray-300 px-4 py-2">{{ item.PackageType }}</td>
-                                    <td class="border border-gray-300 px-4 py-2">{{ item.CargoType }}</td>
-                                    <td class="border border-gray-300 px-4 py-2">{{ item.Lenght }} × {{ item.Breadth }} × {{ item.Height }} CM</td>
-                                    <td class="border border-gray-300 px-4 py-2">{{ item.weight_tons|floatformat:4 }}</td>
-                                    <td class="border border-gray-300 px-4 py-2">{{ item.volume_cbm|floatformat:4 }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
+        {% for scenario in scenarios %}
+        <details class="bg-white dark:bg-gray-800 shadow rounded p-6 mb-6">
+            <summary class="text-2xl font-semibold mb-4 border-b pb-2 cursor-pointer">{{ scenario.name }}</summary>
 
-        <div class="bg-white dark:bg-gray-800 shadow rounded p-6 mb-6">
-            <h2 class="text-2xl font-semibold mb-4 border-b pb-2">3D Models</h2>
-            {% for image in model_images %}
-                <div class="mb-4">
-                    <h3 class="text-xl font-medium mb-2">Container {{ forloop.counter }}</h3>
-                    <iframe src="{% static image %}" width="100%" height="600" frameborder="0"></iframe>
-                </div>
-            {% endfor %}
-        </div>
-
-        {% if remaining_items %}
-        <div class="bg-white dark:bg-gray-800 shadow rounded p-6 mb-6">
-            <h2 class="text-2xl font-semibold mb-4 border-b pb-2">Unstuffed Cargo</h2>
-            <div class="overflow-auto max-h-96">
-                <table class="min-w-full table-auto border-collapse border border-gray-300 text-sm">
-                    <thead class="bg-gray-800 text-white">
-                        <tr>
-                            <th class="border border-gray-300 px-4 py-2">Query ID</th>
-                            <th class="border border-gray-300 px-4 py-2">ID</th>
-                            <th class="border border-gray-300 px-4 py-2">Package Type</th>
-                            <th class="border border-gray-300 px-4 py-2">Cargo Type</th>
-                            <th class="border border-gray-300 px-4 py-2">Dimensions (L×W×H)</th>
-                            <th class="border border-gray-300 px-4 py-2">Weight (tons)</th>
-                            <th class="border border-gray-300 px-4 py-2">Volume (CBM)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in remaining_items %}
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-600" data-queryid="{{ item.queryid }}" data-id="{{ item.id }}">
-                            <td class="border border-gray-300 px-4 py-2">{{ item.queryid }}</td>
-                            <td class="border border-gray-300 px-4 py-2">{{ item.id }}</td>
-                            <td class="border border-gray-300 px-4 py-2">{{ item.PackageType }}</td>
-                            <td class="border border-gray-300 px-4 py-2">{{ item.CargoType }}</td>
-                            <td class="border border-gray-300 px-4 py-2">{{ item.Lenght }} × {{ item.Breadth }} × {{ item.Height }} CM</td>
-                            <td class="border border-gray-300 px-4 py-2">{{ item.weight_tons|floatformat:4 }}</td>
-                            <td class="border border-gray-300 px-4 py-2">{{ item.volume_cbm|floatformat:4 }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <div class="bg-gray-50 dark:bg-gray-700 rounded p-4 mb-4">
+                <h3 class="text-xl font-medium mb-2">Packed Containers</h3>
+                {% for container in scenario.containers_used %}
+                    <div class="bg-white dark:bg-gray-600 rounded p-4 mb-4">
+                        <h4 class="text-lg font-medium mb-2">Container {{ forloop.counter }}: {{ container.container.name }} - {{ container.container.size }} (Instance {{ container.container_number }})</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <p><strong>Total Weight Used:</strong> {{ container.total_weight|floatformat:2 }} tons</p>
+                            <p><strong>Total Volume Used:</strong> {{ container.total_volume|floatformat:2 }} CBM</p>
+                        </div>
+                        <div class="overflow-auto max-h-96">
+                            <table class="min-w-full table-auto border-collapse border border-gray-300 text-sm">
+                                <thead class="bg-gray-800 text-white">
+                                    <tr>
+                                        <th class="border border-gray-300 px-4 py-2">Query ID</th>
+                                        <th class="border border-gray-300 px-4 py-2">ID</th>
+                                        <th class="border border-gray-300 px-4 py-2">Package Type</th>
+                                        <th class="border border-gray-300 px-4 py-2">Cargo Type</th>
+                                        <th class="border border-gray-300 px-4 py-2">Dimensions (L×W×H)</th>
+                                        <th class="border border-gray-300 px-4 py-2">Weight (tons)</th>
+                                        <th class="border border-gray-300 px-4 py-2">Volume (CBM)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in container.items %}
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-500" data-queryid="{{ item.queryid }}" data-id="{{ item.id }}">
+                                        <td class="border border-gray-300 px-4 py-2">{{ item.queryid }}</td>
+                                        <td class="border border-gray-300 px-4 py-2">{{ item.id }}</td>
+                                        <td class="border border-gray-300 px-4 py-2">{{ item.PackageType }}</td>
+                                        <td class="border border-gray-300 px-4 py-2">{{ item.CargoType }}</td>
+                                        <td class="border border-gray-300 px-4 py-2">{{ item.Lenght }} × {{ item.Breadth }} × {{ item.Height }} CM</td>
+                                        <td class="border border-gray-300 px-4 py-2">{{ item.weight_tons|floatformat:4 }}</td>
+                                        <td class="border border-gray-300 px-4 py-2">{{ item.volume_cbm|floatformat:4 }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                {% endfor %}
             </div>
-        </div>
-        {% endif %}
+
+            <div class="bg-white dark:bg-gray-600 rounded p-4 mb-4">
+                <h3 class="text-xl font-medium mb-2">3D Models</h3>
+                {% for image in scenario.model_images %}
+                    <div class="mb-4">
+                        <h4 class="text-lg font-medium mb-2">Container {{ forloop.counter }}</h4>
+                        <iframe src="{% static image %}" width="100%" height="600" frameborder="0"></iframe>
+                    </div>
+                {% endfor %}
+            </div>
+
+            {% if scenario.remaining_items %}
+            <div class="bg-white dark:bg-gray-600 rounded p-4 mb-4">
+                <h3 class="text-xl font-medium mb-2">Unstuffed Cargo</h3>
+                <div class="overflow-auto max-h-96">
+                    <table class="min-w-full table-auto border-collapse border border-gray-300 text-sm">
+                        <thead class="bg-gray-800 text-white">
+                            <tr>
+                                <th class="border border-gray-300 px-4 py-2">Query ID</th>
+                                <th class="border border-gray-300 px-4 py-2">ID</th>
+                                <th class="border border-gray-300 px-4 py-2">Package Type</th>
+                                <th class="border border-gray-300 px-4 py-2">Cargo Type</th>
+                                <th class="border border-gray-300 px-4 py-2">Dimensions (L×W×H)</th>
+                                <th class="border border-gray-300 px-4 py-2">Weight (tons)</th>
+                                <th class="border border-gray-300 px-4 py-2">Volume (CBM)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in scenario.remaining_items %}
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-500" data-queryid="{{ item.queryid }}" data-id="{{ item.id }}">
+                                <td class="border border-gray-300 px-4 py-2">{{ item.queryid }}</td>
+                                <td class="border border-gray-300 px-4 py-2">{{ item.id }}</td>
+                                <td class="border border-gray-300 px-4 py-2">{{ item.PackageType }}</td>
+                                <td class="border border-gray-300 px-4 py-2">{{ item.CargoType }}</td>
+                                <td class="border border-gray-300 px-4 py-2">{{ item.Lenght }} × {{ item.Breadth }} × {{ item.Height }} CM</td>
+                                <td class="border border-gray-300 px-4 py-2">{{ item.weight_tons|floatformat:4 }}</td>
+                                <td class="border border-gray-300 px-4 py-2">{{ item.volume_cbm|floatformat:4 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </details>
+        {% endfor %}
 
 
 
