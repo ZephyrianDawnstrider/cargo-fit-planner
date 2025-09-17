@@ -1,4 +1,3 @@
-- [x] Modify upload.html layout: Change grid to flex layout, make cargo items full width, configuration as fixed sidebar on right
-- [ ] Adjust text colors in upload.html for better visibility in light and dark modes
-- [ ] Verify conditional filtering for container sizes (console ID 7, closed_body_truck ID 8)
-- [ ] Test the layout and functionality
+- [x] Modify optimization/utils.py: Add colors list and get_color function, update create_3d_model to sort items by volume descending, implement grid-based placement for stacking, use unique colors per item.
+- [x] Update optimization/templates/optimization/results.html: Add data-queryid and data-id attributes to table rows in packed containers and unstuffed cargo tables.
+- [x] Test the changes by running the Django server and checking the 3D models and table colors.

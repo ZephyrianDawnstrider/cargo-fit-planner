@@ -1,249 +1,145 @@
 import numpy as np
 import pandas as pd
 from ortools.linear_solver import pywraplp
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import plotly.graph_objects as go
+import os
 
-# Function to convert weight from database fields to metric tons and calculate volume
-def convert_weights(data):
-    # Calculate total weight per item
-    if 'WeightPerUnit' in data.columns and 'TotalUnits' in data.columns and 'BasePackageWeight' in data.columns:
-        data['WEIGHT_TONS'] = (
-            (pd.to_numeric(data['WeightPerUnit'], errors='coerce') * pd.to_numeric(data['TotalUnits'], errors='coerce')) +
-            pd.to_numeric(data['BasePackageWeight'], errors='coerce')
-        ) / 1000
-    else:
-        # Fallback for existing data
-        weight_column = 'WEIGHT' if 'WEIGHT' in data.columns else 'Weight'
-        data['WEIGHT_TONS'] = pd.to_numeric(data[weight_column], errors='coerce') / 1000
+colors = [
+    '#ff0026', '#e66b94', '#dd00ff', '#6600ff', '#8b99e7', '#0095ff', '#00fff2', '#00ff00', '#e5ff00', '#b1ab71',
+    '#79725c', '#ff9d00', 'rgba(124, 96, 93, 1)', '#7a2900', '#854242', '#815959', '#f14a4a', '#5a5a5a', '#381010', '#520000'
+]
 
-    # Calculate volume
-    if 'Lenght' in data.columns and 'Breadth' in data.columns and 'Height' in data.columns:
-        data['CBM'] = (
-            pd.to_numeric(data['Lenght'], errors='coerce') *
-            pd.to_numeric(data['Breadth'], errors='coerce') *
-            pd.to_numeric(data['Height'], errors='coerce') / 1000000  # Convert cm³ to m³
-        )
-    else:
-        data['CBM'] = 0
+def get_color(queryid, id_val):
+    key = f"{queryid}-{id_val}"
+    hash_val = abs(hash(key)) % len(colors)
+    return colors[hash_val]
 
-    return data
-
-# Function to calculate the cost based on weight and volume
-def calculate_cost(weight, volume, max_weight):
-    # Costing based on weight and volume
-    if 10 <= weight <= 15 and volume <= max_weight:
-        return 103000  # 15 tons
-    elif 4.5 <= weight <= 6 and volume <= max_weight:
-        return 78000  # 6 tons
-    elif 7 <= weight <= 9 and volume <= max_weight:
-        return 90000  # 9 tons
-    elif 16 <= weight <= 18 and volume <= max_weight:
-        return 113000  # 18 tons
-    elif 20 <= weight <= 24 and volume <= max_weight:
-        return 145000  # 24 tons
-    else:
-        return 0  # Return 0 for cases that don't match any condition
-
-# Function to optimize package selection based on weight and volume constraints
-def optimize_packages(data, carry_capacity, carry_volume):
-    required_columns = ['WEIGHT_TONS', 'CBM']
+def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio=0.5):
+    required_columns = ['weight_tons', 'volume_cbm']
     if not all(col in data.columns for col in required_columns):
-        raise ValueError(f"Data must contain columns: {required_columns}")
+        return [], 0, 0
 
     solver = pywraplp.Solver.CreateSolver('SCIP')
     if not solver:
-        raise ValueError("Solver creation failed. Ensure that OR-Tools is properly installed.")
+        return [], 0, 0
 
     num_packages = len(data)
     x = [solver.IntVar(0, 1, f'x[{i}]') for i in range(num_packages)]
 
-    solver.Add(solver.Sum(data.loc[i, 'WEIGHT_TONS'] * x[i] for i in range(num_packages)) <= carry_capacity)
-    solver.Add(solver.Sum(data.loc[i, 'CBM'] * x[i] for i in range(num_packages)) <= carry_volume)
+    total_weight = solver.Sum(data.loc[i, 'weight_tons'] * x[i] for i in range(num_packages))
+    total_volume = solver.Sum(data.loc[i, 'volume_cbm'] * x[i] for i in range(num_packages))
 
-    # Maximize total weight and volume (simple objective without priority dates)
-    objective = solver.Sum(
-        (data.loc[i, 'WEIGHT_TONS'] + data.loc[i, 'CBM']) * x[i]
-        for i in range(num_packages)
-    )
+    solver.Add(total_weight <= carry_capacity)
+    solver.Add(total_volume <= carry_volume)
+    solver.Add(total_weight >= min_weight_ratio * carry_capacity)
+
+    # Maximize number of packages
+    objective = solver.Sum(x[i] for i in range(num_packages))
     solver.Maximize(objective)
 
     status = solver.Solve()
 
     if status == pywraplp.Solver.OPTIMAL:
-        selected_packages = [i for i in range(num_packages) if x[i].solution_value()]
-        total_weight_used = sum(data.loc[i, 'WEIGHT_TONS'] for i in selected_packages)
-        total_volume_used = sum(data.loc[i, 'CBM'] for i in selected_packages)
+        selected_packages = [i for i in range(num_packages) if x[i].solution_value() > 0.5]
+        total_weight_used = sum(data.loc[i, 'weight_tons'] for i in selected_packages)
+        total_volume_used = sum(data.loc[i, 'volume_cbm'] for i in selected_packages)
         return selected_packages, total_weight_used, total_volume_used
     else:
-        raise ValueError("The solver did not find an optimal solution.")
+        return [], 0, 0
 
-# Function to create packages based on optimized selection
-def create_packages(data, carry_capacity, carry_volume, include_cost=True, max_weight=24):
-    packages = []
-    unfulfilled_due_to_volume = pd.DataFrame()
+def create_3d_model(container_length, container_breadth, container_height, items, output_path):
+    fig = go.Figure()
 
-    while not data.empty:
-        selected_packages, total_weight_used, total_volume_used = optimize_packages(data, carry_capacity, carry_volume)
-        if not selected_packages:
-            break
+    # Draw container
+    fig.add_trace(go.Mesh3d(
+        x=[0, container_length, container_length, 0, 0, container_length, container_length, 0],
+        y=[0, 0, container_breadth, container_breadth, 0, 0, container_breadth, container_breadth],
+        z=[0, 0, 0, 0, container_height, container_height, container_height, container_height],
+        i=[0,0,4,4,0,0,3,3,0,0,1,1],
+        j=[1,2,5,6,1,5,2,6,3,7,2,6],
+        k=[2,3,6,7,5,4,6,7,7,4,6,5],
+        opacity=0.3,
+        color='lightblue',
+        name='Container'
+    ))
 
-        selected_data = data.iloc[selected_packages]
-        total_cost = calculate_cost(total_weight_used, total_volume_used, max_weight) if include_cost else None
+    # Sort items by volume descending for better packing
+    items.sort(key=lambda x: float(x.get('Lenght', 1)) * float(x.get('Breadth', 1)) * float(x.get('Height', 1)), reverse=True)
 
-        if not (
-            (4.5 <= total_weight_used <= 6) or
-            (7 <= total_weight_used <= 9) or
-            (10 <= total_weight_used <= 15) or
-            (16 <= total_weight_used <= 18) or
-            (20 <= total_weight_used <= 24)
-        ) or total_cost == 0:
-            unfulfilled_due_to_volume = pd.concat([unfulfilled_due_to_volume, selected_data])
-        else:
-            # Include all columns from the selected data
-            console_df = pd.DataFrame(selected_data)
-            console_df.insert(0, 'Console', f"Console {len(packages) + 1}")
+    # Initialize height map for stacking
+    grid_size = 0.1  # 10 cm grid
+    num_x = int(container_length / grid_size) + 1
+    num_y = int(container_breadth / grid_size) + 1
+    height_map = [[0.0 for _ in range(num_y)] for _ in range(num_x)]
 
-            packages.append({
-                'Console Data': console_df,
-                'Total Weight': round(total_weight_used, 2),
-                'Total Volume': round(total_volume_used, 2),
-                'Total Cost': total_cost
-            })
+    for item in items:
+        l = float(item.get('Lenght', 1)) / 100  # Convert cm to m
+        b = float(item.get('Breadth', 1)) / 100
+        h = float(item.get('Height', 1)) / 100
+        cargo_type = item.get('CargoType', 'General Goods')
+        if cargo_type == 'Dangerous Goods':
+            h += 0.1  # 10 cm extra
 
-        data = data.drop(selected_packages).reset_index(drop=True)
+        color = get_color(item.get('queryid'), item.get('id'))
 
-    return packages, unfulfilled_due_to_volume
+        # Find best position
+        best_x, best_y, best_z = None, None, float('inf')
+        step = grid_size
+        x_range = range(0, int((container_length - l) / step) + 1)
+        y_range = range(0, int((container_breadth - b) / step) + 1)
 
-# Recursive function to create packages for all weight classes and split larger ones
-def create_packages_recursive(data, weight_range, carry_volume, include_cost, max_weight):
-    packages = []
-    unfulfilled_packages = pd.DataFrame()
+        # For dangerous goods, prefer low x
+        if cargo_type == 'Dangerous Goods':
+            x_range = sorted(x_range, key=lambda ix: ix * step)  # low x first
 
-    while not data.empty:
-        # Optimize the maximum weight in the range
-        selected_packages, total_weight_used, total_volume_used = optimize_packages(data, weight_range[-1], carry_volume)
+        for ix in x_range:
+            x = ix * step
+            for iy in y_range:
+                y = iy * step
+                # Get max_z in the area
+                max_z_here = 0
+                start_gx = int(x / grid_size)
+                end_gx = int((x + l) / grid_size)
+                start_gy = int(y / grid_size)
+                end_gy = int((y + b) / grid_size)
+                for gx in range(start_gx, end_gx + 1):
+                    for gy in range(start_gy, end_gy + 1):
+                        if 0 <= gx < num_x and 0 <= gy < num_y:
+                            max_z_here = max(max_z_here, height_map[gx][gy])
+                # For non-stackable, only at z=0
+                if cargo_type == 'Non-Stackable' and max_z_here > 0:
+                    continue
+                if max_z_here + h <= container_height and max_z_here < best_z:
+                    best_z = max_z_here
+                    best_x = x
+                    best_y = y
 
-        if not selected_packages:
-            break
+        if best_x is not None:
+            # Place item
+            fig.add_trace(go.Mesh3d(
+                x=[best_x, best_x+l, best_x+l, best_x, best_x, best_x+l, best_x+l, best_x],
+                y=[best_y, best_y, best_y+b, best_y+b, best_y, best_y, best_y+b, best_y+b],
+                z=[best_z, best_z, best_z, best_z, best_z+h, best_z+h, best_z+h, best_z+h],
+                i=[0, 0, 0, 1, 4, 4, 2, 6, 4, 0, 3, 7],
+                j=[1, 2, 3, 5, 5, 6, 6, 7, 1, 2, 2, 6],
+                k=[2, 3, 0, 6, 6, 7, 7, 2, 5, 5, 3, 3],
+                color=color,
+                opacity=0.7,
+                name=f"Q{item.get('queryid')}-I{item.get('id')} ({cargo_type})"
+            ))
+            # Update height_map
+            for gx in range(int(best_x / grid_size), int((best_x + l) / grid_size) + 1):
+                for gy in range(int(best_y / grid_size), int((best_y + b) / grid_size) + 1):
+                    if 0 <= gx < num_x and 0 <= gy < num_y:
+                        height_map[gx][gy] = best_z + h
 
-        selected_data = data.iloc[selected_packages]
-        total_cost = calculate_cost(total_weight_used, total_volume_used, max_weight) if include_cost else None
+    fig.update_layout(scene=dict(
+        xaxis_title='Length (m)',
+        yaxis_title='Breadth (m)',
+        zaxis_title='Height (m)',
+        aspectmode='data'
+    ))
 
-        # Check if weight can be split
-        if total_weight_used == 15:
-            packages.append({
-                'Job Nos': selected_data['id'].tolist(),
-                'Total Weight': 9,
-                'Total Volume': total_volume_used * (9 / 15),
-                'Total Cost': calculate_cost(9, total_volume_used * (9 / 15), max_weight) if include_cost else None
-            })
-            packages.append({
-                'Job Nos': selected_data['id'].tolist(),
-                'Total Weight': 6,
-                'Total Volume': total_volume_used * (6 / 15),
-                'Total Cost': calculate_cost(6, total_volume_used * (6 / 15), max_weight) if include_cost else None
-            })
-        elif total_weight_used == 18:
-            packages.append({
-                'Job Nos': selected_data['id'].tolist(),
-                'Total Weight': 15,
-                'Total Volume': total_volume_used * (15 / 18),
-                'Total Cost': calculate_cost(15, total_volume_used * (15 / 18), max_weight) if include_cost else None
-            })
-            packages.append({
-                'Job Nos': selected_data['id'].tolist(),
-                'Total Weight': 6,
-                'Total Volume': total_volume_used * (6 / 18),
-                'Total Cost': calculate_cost(6, total_volume_used * (6 / 18), max_weight) if include_cost else None
-            })
-            packages.append({
-                'Job Nos': selected_data['id'].tolist(),
-                'Total Weight': 9,
-                'Total Volume': total_volume_used * (9 / 18),
-                'Total Cost': calculate_cost(9, total_volume_used * (9 / 18), max_weight) if include_cost else None
-            })
-        elif total_weight_used == 24:
-            packages.append({
-                'Job Nos': selected_data['id'].tolist(),
-                'Total Weight': 18,
-                'Total Volume': total_volume_used * (18 / 24),
-                'Total Cost': calculate_cost(18, total_volume_used * (18 / 24), max_weight) if include_cost else None
-            })
-            packages.append({
-                'Job Nos': selected_data['id'].tolist(),
-                'Total Weight': 15,
-                'Total Volume': total_volume_used * (15 / 24),
-                'Total Cost': calculate_cost(15, total_volume_used * (15 / 24), max_weight) if include_cost else None
-            })
-            packages.append({
-                'Job Nos': selected_data['id'].tolist(),
-                'Total Weight': 6,
-                'Total Volume': total_volume_used * (6 / 24),
-                'Total Cost': calculate_cost(6, total_volume_used * (6 / 24), max_weight) if include_cost else None
-            })
-            packages.append({
-                'Job Nos': selected_data['id'].tolist(),
-                'Total Weight': 9,
-                'Total Volume': total_volume_used * (9 / 24),
-                'Total Cost': calculate_cost(9, total_volume_used * (9 / 24), max_weight) if include_cost else None
-            })
-        elif not (
-            (4.5 <= total_weight_used <= 6) or
-            (7 <= total_weight_used <= 9) or
-            (10 <= total_weight_used <= 15) or
-            (16 <= total_weight_used <= 18) or
-            (20 <= total_weight_used <= 24)
-        ) or total_cost == 0:
-            unfulfilled_packages = pd.concat([unfulfilled_packages, selected_data])
-        else:
-            packages.append({
-                'Job Nos': selected_data['id'].tolist(),
-                'Total Weight': total_weight_used,
-                'Total Volume': total_volume_used,
-                'Total Cost': total_cost
-            })
-
-        data = data.drop(selected_packages).reset_index(drop=True)
-
-    # Handle smaller weight classes recursively
-    for lower_weight_class in [(4.5, 6), (7, 9), (10, 15), (16, 18), (20, 24)]:
-        if lower_weight_class[-1] < weight_range[-1]:
-            sub_packages, sub_unfulfilled = create_packages_recursive(data, lower_weight_class, carry_volume, include_cost, max_weight)
-            packages.extend(sub_packages)
-            unfulfilled_packages = pd.concat([unfulfilled_packages, sub_unfulfilled])
-
-    return packages, unfulfilled_packages
-
-# Function to analyze weight classes and generate a report based on unfulfilled jobs
-def analyze_weight_classes(data, container_volume, include_cost=True, max_weight=24):
-    fulfilled_files = {}
-    unfulfilled_files = []
-
-    weight_class_ranges = {
-        '6 Tones': [4.5, 6],
-        '9 Tones': [7, 9],
-        '15 Tones': [10, 15],
-        '18 Tones': [16, 18],
-        '24 Tones': [20, 24]
-    }
-
-    best_class = None
-    best_unfulfilled_count = float('inf')
-    best_cost = float('inf')
-
-    for weight_class, weight_range in weight_class_ranges.items():
-        packages, unfulfilled_packages = create_packages(data.copy(), weight_range[-1], container_volume, include_cost, max_weight)
-
-        # Store fulfilled packages by weight class
-        fulfilled_files[weight_class] = packages
-        unfulfilled_count = len(unfulfilled_packages)
-        total_unfulfilled_weight = round(unfulfilled_packages['WEIGHT_TONS'].sum(), 2) if not unfulfilled_packages.empty else 0
-        total_unfulfilled_cost = calculate_cost(total_unfulfilled_weight, 0, max_weight)
-
-        if unfulfilled_count < best_unfulfilled_count or (unfulfilled_count == best_unfulfilled_count and total_unfulfilled_cost < best_cost):
-            best_class = weight_class
-            best_unfulfilled_count = unfulfilled_count
-            best_cost = total_unfulfilled_cost
-
-        unfulfilled_files.append((weight_class, unfulfilled_packages))
-
-    return fulfilled_files, unfulfilled_files, best_class
+    fig.write_html(output_path.replace('.png', '.html'))

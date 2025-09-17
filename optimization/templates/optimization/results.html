@@ -1,125 +1,101 @@
 {% extends 'optimization/base.html' %}
+{% load static %}
 
 {% block title %}Optimization Results{% endblock %}
 
 {% block content %}
     <div class="container mx-auto p-4">
         <div class="text-center mb-8">
-            <h1 class="text-4xl font-bold mb-2 text-gray-800 dark:text-gray-100">Optimization Results</h1>
-            <p class="text-lg text-gray-600 dark:text-gray-300">Detailed analysis of your container stuffing optimization</p>
+            <h1 class="text-4xl font-bold mb-2 text-gray-800 dark:text-gray-100">Container Stuffing Results</h1>
+            <p class="text-lg text-gray-600 dark:text-gray-300">Visualization of packed items in containers</p>
         </div>
 
         <div class="bg-white dark:bg-gray-800 shadow rounded p-6 mb-6">
-            <h2 class="text-2xl font-semibold mb-4 border-b pb-2 flex items-center">
-                <svg class="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                </svg>
-                Summary Report
-            </h2>
-            <div class="space-y-2">
-                <p><strong>Best Weight Class:</strong> {{ best_class }}</p>
-                <p><strong>Total Cost for Best Weight Class:</strong> {{ total_cost_best_class }}</p>
-                <p><strong>Total Unfulfilled Count:</strong> {{ total_unfulfilled_count }}</p>
-            </div>
-        </div>
-
-        <div class="bg-white dark:bg-gray-800 shadow rounded p-6 mb-6">
-            <h2 class="text-2xl font-semibold mb-4 border-b pb-2 flex items-center">
-                <svg class="w-6 h-6 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                </svg>
-                Consoles for Best Weight Class
-            </h2>
-            {% for package in best_packages %}
-                <div class="bg-gray-50 rounded p-4 mb-4">
-                    <h3 class="text-xl font-medium mb-2">Console</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <p><strong>Total Weight Used:</strong> {{ package.total_weight }} tons</p>
-                        <p><strong>Total Volume Used:</strong> {{ package.total_volume }} CBM</p>
-                        <p><strong>Total Cost:</strong> {{ package.total_cost }}</p>
-                    </div>
-                    <div class="overflow-auto max-h-96">
-                        {{ package.console_data_html|safe }}
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
-
-        <div class="bg-white dark:bg-gray-800 shadow rounded p-6 mb-6">
-            <h2 class="text-2xl font-semibold mb-4 border-b pb-2 flex items-center">
-                <svg class="w-6 h-6 mr-2 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                </svg>
-                Unfulfilled Packages for Best Weight Class
-            </h2>
-            {% for unfulfilled in unfulfilled_best %}
+            <h2 class="text-2xl font-semibold mb-4 border-b pb-2">Packed Containers</h2>
+            {% for container in containers_used %}
                 <div class="bg-gray-50 dark:bg-gray-700 rounded p-4 mb-4">
-                    <h3 class="text-xl font-medium mb-2">{{ unfulfilled.weight_class }}</h3>
+                    <h3 class="text-xl font-medium mb-2">Container {{ forloop.counter }}: {{ container.container.name }} - {{ container.container.size }} (Instance {{ container.container_number }})</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <p><strong>Total Weight Used:</strong> {{ container.total_weight|floatformat:2 }} tons</p>
+                        <p><strong>Total Volume Used:</strong> {{ container.total_volume|floatformat:2 }} CBM</p>
+                    </div>
                     <div class="overflow-auto max-h-96">
-                        {{ unfulfilled.data_html|safe }}
+                        <table class="min-w-full table-auto border-collapse border border-gray-300 text-sm">
+                            <thead class="bg-gray-800 text-white">
+                                <tr>
+                                    <th class="border border-gray-300 px-4 py-2">Query ID</th>
+                                    <th class="border border-gray-300 px-4 py-2">ID</th>
+                                    <th class="border border-gray-300 px-4 py-2">Package Type</th>
+                                    <th class="border border-gray-300 px-4 py-2">Cargo Type</th>
+                                    <th class="border border-gray-300 px-4 py-2">Dimensions (L×W×H)</th>
+                                    <th class="border border-gray-300 px-4 py-2">Weight (tons)</th>
+                                    <th class="border border-gray-300 px-4 py-2">Volume (CBM)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in container.items %}
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-600" data-queryid="{{ item.queryid }}" data-id="{{ item.id }}">
+                                    <td class="border border-gray-300 px-4 py-2">{{ item.queryid }}</td>
+                                    <td class="border border-gray-300 px-4 py-2">{{ item.id }}</td>
+                                    <td class="border border-gray-300 px-4 py-2">{{ item.PackageType }}</td>
+                                    <td class="border border-gray-300 px-4 py-2">{{ item.CargoType }}</td>
+                                    <td class="border border-gray-300 px-4 py-2">{{ item.Lenght }} × {{ item.Breadth }} × {{ item.Height }} CM</td>
+                                    <td class="border border-gray-300 px-4 py-2">{{ item.weight_tons|floatformat:4 }}</td>
+                                    <td class="border border-gray-300 px-4 py-2">{{ item.volume_cbm|floatformat:4 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             {% endfor %}
         </div>
 
         <div class="bg-white dark:bg-gray-800 shadow rounded p-6 mb-6">
-            <h2 class="text-2xl font-semibold mb-4 border-b pb-2 flex items-center">
-                <svg class="w-6 h-6 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                </svg>
-                Comparative Report
-            </h2>
-            <div class="overflow-auto max-h-96">
-                {{ comparative_html|safe }}
-            </div>
+            <h2 class="text-2xl font-semibold mb-4 border-b pb-2">3D Models</h2>
+            {% for image in model_images %}
+                <div class="mb-4">
+                    <h3 class="text-xl font-medium mb-2">Container {{ forloop.counter }}</h3>
+                    <iframe src="{% static image %}" width="100%" height="600" frameborder="0"></iframe>
+                </div>
+            {% endfor %}
         </div>
 
-        <details class="bg-white dark:bg-gray-800 shadow rounded p-6 mb-6 group">
-            <summary class="text-2xl font-semibold cursor-pointer flex items-center justify-between">
-                <span class="flex items-center">
-                    <svg class="w-6 h-6 mr-2 text-indigo-600 group-open:rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                    </svg>
-                    View All Fulfilled Consoles
-                </span>
-            </summary>
-            <div class="mt-4">
-                {% for fulfilled in all_fulfilled %}
-                    <div class="bg-gray-50 dark:bg-gray-700 rounded p-4 mb-4">
-                        <h5 class="text-lg font-medium mb-2">Package {{ fulfilled.package_idx }} for Weight Class: {{ fulfilled.weight_class }}</h5>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                            <p><strong>Total Weight Used:</strong> {{ fulfilled.total_weight }} tons</p>
-                            <p><strong>Total Volume Used:</strong> {{ fulfilled.total_volume }} CBM</p>
-                            <p><strong>Total Cost:</strong> {{ fulfilled.total_cost }}</p>
-                        </div>
-                        <div class="overflow-auto max-h-96">
-                            {{ fulfilled.console_data_html|safe }}
-                        </div>
-                    </div>
-                {% endfor %}
+        {% if remaining_items %}
+        <div class="bg-white dark:bg-gray-800 shadow rounded p-6 mb-6">
+            <h2 class="text-2xl font-semibold mb-4 border-b pb-2">Unstuffed Cargo</h2>
+            <div class="overflow-auto max-h-96">
+                <table class="min-w-full table-auto border-collapse border border-gray-300 text-sm">
+                    <thead class="bg-gray-800 text-white">
+                        <tr>
+                            <th class="border border-gray-300 px-4 py-2">Query ID</th>
+                            <th class="border border-gray-300 px-4 py-2">ID</th>
+                            <th class="border border-gray-300 px-4 py-2">Package Type</th>
+                            <th class="border border-gray-300 px-4 py-2">Cargo Type</th>
+                            <th class="border border-gray-300 px-4 py-2">Dimensions (L×W×H)</th>
+                            <th class="border border-gray-300 px-4 py-2">Weight (tons)</th>
+                            <th class="border border-gray-300 px-4 py-2">Volume (CBM)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in remaining_items %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-600" data-queryid="{{ item.queryid }}" data-id="{{ item.id }}">
+                            <td class="border border-gray-300 px-4 py-2">{{ item.queryid }}</td>
+                            <td class="border border-gray-300 px-4 py-2">{{ item.id }}</td>
+                            <td class="border border-gray-300 px-4 py-2">{{ item.PackageType }}</td>
+                            <td class="border border-gray-300 px-4 py-2">{{ item.CargoType }}</td>
+                            <td class="border border-gray-300 px-4 py-2">{{ item.Lenght }} × {{ item.Breadth }} × {{ item.Height }} CM</td>
+                            <td class="border border-gray-300 px-4 py-2">{{ item.weight_tons|floatformat:4 }}</td>
+                            <td class="border border-gray-300 px-4 py-2">{{ item.volume_cbm|floatformat:4 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-        </details>
+        </div>
+        {% endif %}
 
-        <details class="bg-white dark:bg-gray-800 shadow rounded p-6 mb-6 group">
-            <summary class="text-2xl font-semibold cursor-pointer flex items-center justify-between">
-                <span class="flex items-center">
-                    <svg class="w-6 h-6 mr-2 text-orange-600 group-open:rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                    </svg>
-                    View Unfulfilled Packages
-                </span>
-            </summary>
-            <div class="mt-4">
-                {% for unfulfilled in all_unfulfilled %}
-                    <div class="bg-gray-50 dark:bg-gray-700 rounded p-4 mb-4">
-                        <h3 class="text-xl font-medium mb-2">{{ unfulfilled.weight_class }}</h3>
-                        <div class="overflow-auto max-h-96">
-                            {{ unfulfilled.data_html|safe }}
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
-        </details>
+
 
         <div class="text-center mt-8 space-y-4">
             <a href="{% url 'upload' %}" class="inline-flex items-center bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-bold py-3 px-6 rounded-lg transition-all">
@@ -147,6 +123,39 @@
         });
         backToTopBtn.addEventListener('click', () => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        // Color scheme for unique combinations of query id and id
+        const colors = [
+            '#ff0026ff', '#e66b94ff', '#dd00ffff', '#6600ffff', '#8b99e7ff', '#0095ffff', '#00fff2ff', '#00ff00ff', '#e5ff00ff', '#b1ab71ff',
+            '#79725cff', '#ff9d00ff', 'rgba(124, 96, 93, 1)', '#7a2900ff', '#854242ff', '#815959ff', '#f14a4aff', '#5a5a5aff', '#381010ff', '#520000ff'
+        ];
+        const colorMap = new Map();
+
+        function getColor(queryId, id) {
+            const key = `${queryId}-${id}`;
+            if (!colorMap.has(key)) {
+                colorMap.set(key, colors[colorMap.size % colors.length]);
+            }
+            return colorMap.get(key);
+        }
+
+        // Apply colors to console data tables
+        document.querySelectorAll('.bg-gray-50.rounded.p-4.mb-4 .overflow-auto table tbody tr').forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length > 0) {
+                // Assume first cell is ID, but since no data attributes, use index or something
+                // For now, assign sequential colors
+                const index = Array.from(row.parentNode.children).indexOf(row);
+                row.style.backgroundColor = colors[index % colors.length];
+            }
+        });
+
+        // For tables with data attributes (when implemented)
+        document.querySelectorAll('tr[data-queryid][data-id]').forEach(row => {
+            const queryId = row.getAttribute('data-queryid');
+            const id = row.getAttribute('data-id');
+            row.style.backgroundColor = getColor(queryId, id);
         });
     </script>
 

@@ -129,19 +129,25 @@
         });
 
         // Search functionality for cargo items
-        document.getElementById('search').addEventListener('input', function() {
-            const query = this.value.toLowerCase();
+        function filterRows() {
+            const queryId = document.getElementById('search-query-id').value.toLowerCase().trim();
+            const id = document.getElementById('search-id').value.toLowerCase().trim();
             const rows = document.querySelectorAll('tbody tr');
             rows.forEach(row => {
-                const id = row.cells[2].textContent.toLowerCase();
-                const packageType = row.cells[3].textContent.toLowerCase();
-                if (id.includes(query) || packageType.includes(query)) {
+                const rowQueryId = row.cells[1].textContent.toLowerCase().trim();
+                const rowId = row.cells[2].textContent.toLowerCase().trim();
+                const matchesQueryId = rowQueryId.includes(queryId) || queryId === '';
+                const matchesId = rowId.includes(id) || id === '';
+                if (matchesQueryId && matchesId) {
                     row.style.display = '';
                 } else {
                     row.style.display = 'none';
                 }
             });
-        });
+        }
+
+        document.getElementById('search-query-id').addEventListener('input', filterRows);
+        document.getElementById('search-id').addEventListener('input', filterRows);
 
         // Update selected count
         function updateSelectedCount() {
@@ -252,8 +258,9 @@
                 <div class="md:col-span-3">
                 <div class="bg-white dark:bg-gray-800 shadow rounded p-4">
                     <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Cargo Items Selection</h2>
-                    <div class="mb-4">
-                        <input type="text" id="search" placeholder="Search by ID or Package Type..." class="border p-2 w-full bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
+                    <div class="mb-4 grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <input type="text" id="search-query-id" placeholder="Search by Query ID..." class="border p-2 w-full bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
+                        <input type="text" id="search-id" placeholder="Search by ID..." class="border p-2 w-full bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
                     </div>
                     <p id="selected-count" class="text-gray-800 dark:text-white">0 of {{ dimensions|length }} items selected</p>
                     <div class="overflow-auto max-h-96">
@@ -266,6 +273,7 @@
                                             <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-white">Package Type</th>
                                             <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-white">Cargo Type</th>
                                             <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-white">Dimensions (L×W×H)</th>
+                                            <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-white">Dimensions Unit</th>
                                             <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-white">Unit</th>
                                             <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-white">Weight/Unit</th>
                                             <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-white">Units</th>
@@ -277,11 +285,12 @@
                                         {% for dimension in dimensions %}
                                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
                                             <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white"><input type="checkbox" class="dimension-checkbox" value="{{ dimension.id }}"></td>
-                                            <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.id }}</td>
+                                            <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.queryid }}</td>
                                             <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.id }}</td>
                                             <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.PackageType }}</td>
                                             <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.CargoType }}</td>
                                             <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.Lenght }}.00 × {{ dimension.Breadth }}.00 × {{ dimension.Height }}.00 CM</td>
+                                            <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.dimensionunit }}</td>
                                             <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">KG kg</td>
                                             <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.WeightPerUnit }}.00</td>
                                             <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.TotalUnits }}.00</td>

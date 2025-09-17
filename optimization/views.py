@@ -2,9 +2,13 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from .forms import UploadForm
 from .models import Dimensions, Containertypes
-from .utils import convert_weights, analyze_weight_classes
+from .utils import optimize_packages, create_3d_model
 import pandas as pd
 import json
+import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 def upload_view(request):
     if request.method == 'POST':
@@ -56,6 +60,9 @@ def upload_view(request):
                 if not containers:
                     return render(request, 'optimization/upload.html', {'form': form, 'error': 'No valid containers found.'})
 
+                # Sort containers by volume ascending to prefer smaller ones
+                containers.sort(key=lambda c: float(c.volume_cbm))
+
                 # Get selected dimensions
                 if selected_dimensions_ids:
                     selected_ids = [int(id.strip()) for id in selected_dimensions_ids.split(',') if id.strip()]
@@ -65,107 +72,77 @@ def upload_view(request):
 
                 # Convert to DataFrame for processing
                 data = pd.DataFrame(list(dimensions.values(
-                    'id', 'Lenght', 'Breadth', 'Height', 'WeightPerUnit',
+                    'queryid', 'id', 'Lenght', 'Breadth', 'Height', 'WeightPerUnit',
                     'TotalUnits', 'PackageType', 'CargoType', 'BasePackageWeight'
                 )))
 
                 if data.empty:
                     return render(request, 'optimization/upload.html', {'form': form, 'error': 'No dimensions data available.'})
 
-                # Calculate weight and volume
-                data = convert_weights(data)
+                # Get selected data
+                selected_ids = [int(id.strip()) for id in selected_dimensions_ids.split(',') if id.strip()] if selected_dimensions_ids else []
+                selected_data = data[data['id'].isin(selected_ids)] if selected_ids else data
 
-                # Use combined container volume and max payload
-                fulfilled_files, unfulfilled_files, best_class = analyze_weight_classes(
-                    data, total_volume, include_cost, total_max_weight
-                )
-
-                # Prepare data for template
-                best_packages = []
-                total_cost_best_class = 0
-                if fulfilled_files:
-                    for weight_class, packages in fulfilled_files.items():
-                        if weight_class == best_class:
-                            for pkg in packages:
-                                best_packages.append({
-                                    'console_data_html': pkg['Console Data'].to_html(index=False, classes='min-w-full table-auto border-collapse border border-gray-300 text-sm'),
-                                    'total_weight': pkg['Total Weight'],
-                                    'total_volume': pkg['Total Volume'],
-                                    'total_cost': pkg['Total Cost']
-                                })
-                                if pkg['Total Cost']:
-                                    total_cost_best_class += pkg['Total Cost']
-
-                # Unfulfilled for best class
-                unfulfilled_best = []
-                for wc, unfulfilled in unfulfilled_files:
-                    if wc == best_class:
-                        unfulfilled_best.append({
-                            'weight_class': wc,
-                            'data_html': unfulfilled.to_html(index=False, classes='min-w-full table-auto border-collapse border border-gray-300 text-sm') if not unfulfilled.empty else '<p>No unfulfilled packages.</p>'
+                # Expand data by TotalUnits
+                selected_data_expanded = []
+                for index, row in selected_data.iterrows():
+                    units = int(row['TotalUnits'])
+                    for _ in range(units):
+                        selected_data_expanded.append({
+                            'queryid': row['queryid'],
+                            'id': row['id'],
+                            'Lenght': row['Lenght'],
+                            'Breadth': row['Breadth'],
+                            'Height': row['Height'],
+                            'WeightPerUnit': row['WeightPerUnit'],
+                            'PackageType': row['PackageType'],
+                            'CargoType': row['CargoType'],
+                            'BasePackageWeight': row['BasePackageWeight'],
+                        'weight_tons': (float(row['BasePackageWeight']) / float(row['TotalUnits'])) / 1000,
+                        'volume_cbm': (float(row['Lenght']) * float(row['Breadth']) * (float(row['Height']) + (10 if row['CargoType'] == 'Dangerous Goods' else 0))) / 1000000
                         })
+                selected_data_expanded = pd.DataFrame(selected_data_expanded)
+                logger.info(f"Expanded data to {len(selected_data_expanded)} individual items from {len(selected_data)} selected records.")
 
-                # All fulfilled
-                all_fulfilled = []
-                for idx, (weight_class, packages) in enumerate(fulfilled_files.items()):
-                    for pkg in packages:
-                        all_fulfilled.append({
-                            'package_idx': idx + 1,
-                            'weight_class': weight_class,
-                            'console_data_html': pkg['Console Data'].to_html(index=False, classes='min-w-full table-auto border-collapse border border-gray-300 text-sm'),
-                            'total_weight': pkg['Total Weight'],
-                            'total_volume': pkg['Total Volume'],
-                            'total_cost': pkg['Total Cost']
+                # Pack into containers
+                containers_used = []
+                remaining_data = selected_data_expanded.copy()
+                logger.info(f"Starting packing with {len(remaining_data)} items into {len(containers)} container types.")
+                for container in containers:
+                    container_count = 0
+                    while not remaining_data.empty:
+                        selected_indices, total_weight, total_volume = optimize_packages(remaining_data, float(container.maxpayload_kg) / 1000, float(container.volume_cbm))
+                        if not selected_indices:
+                            break
+                        selected_items = remaining_data.iloc[selected_indices]
+                        container_count += 1
+                        containers_used.append({
+                            'container': container,
+                            'container_number': container_count,
+                            'items': selected_items.to_dict('records'),
+                            'total_weight': total_weight,
+                            'total_volume': total_volume
                         })
+                        logger.info(f"Packed container {container.name} - {container.size} instance {container_count} with {len(selected_items)} items, weight {total_weight:.2f} tons, volume {total_volume:.2f} CBM.")
+                        remaining_data = remaining_data.drop(selected_indices).reset_index(drop=True)
+                logger.info(f"Packing complete. Used {len(containers_used)} containers. Remaining items: {len(remaining_data)}.")
 
-                # All unfulfilled
-                all_unfulfilled = []
-                for weight_class, unfulfilled in unfulfilled_files:
-                    all_unfulfilled.append({
-                        'weight_class': weight_class,
-                        'data_html': unfulfilled.to_html(index=False, classes='min-w-full table-auto border-collapse border border-gray-300 text-sm') if not unfulfilled.empty else '<p>No unfulfilled packages.</p>'
-                    })
-
-                # Comparative report
-                comparative_data = []
-                for weight_class, packages in fulfilled_files.items():
-                    total_weight = sum(pkg['Total Weight'] for pkg in packages)
-                    total_volume = sum(pkg['Total Volume'] for pkg in packages)
-                    total_cost = sum(pkg['Total Cost'] if pkg['Total Cost'] is not None else 0 for pkg in packages)
-
-                    unfulfilled_weight = 0
-                    unfulfilled_volume = 0
-                    for wc, unfulfilled in unfulfilled_files:
-                        if wc == weight_class:
-                            unfulfilled_weight = unfulfilled['WEIGHT_TONS'].sum() if not unfulfilled.empty else 0
-                            unfulfilled_volume = unfulfilled['CBM'].sum() if not unfulfilled.empty else 0
-
-                    comparative_data.append({
-                        'Weight Class': weight_class,
-                        'Total Consoles Made': len(packages),
-                        'Total Weight Used (tons)': total_weight,
-                        'Total Volume Used (CBM)': total_volume,
-                        'Total Unfulfilled Weight (tons)': unfulfilled_weight,
-                        'Total Unfulfilled Volume (CBM)': unfulfilled_volume,
-                        'Total Cost': total_cost
-                    })
-
-                comparative_df = pd.DataFrame(comparative_data)
-                comparative_html = comparative_df.to_html(index=False, classes='min-w-full table-auto border-collapse border border-gray-300 text-sm')
+                # Create 3D models for each used container
+                model_images = []
+                for i, cont in enumerate(containers_used):
+                    output_path = f'optimization/static/optimization/3d_model_{i}.html'
+                    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                    create_3d_model(float(cont['container'].length_m), float(cont['container'].breadth_m), float(cont['container'].height_m), cont['items'], output_path)
+                    model_images.append(f'optimization/3d_model_{i}.html')
 
                 # Create container names string for display
                 container_names = [f"{c.name} - {c.size}" for c in containers]
                 selected_containers_str = ", ".join(container_names)
 
                 context = {
-                    'best_class': best_class,
-                    'total_cost_best_class': total_cost_best_class,
-                    'best_packages': best_packages,
-                    'unfulfilled_best': unfulfilled_best,
-                    'all_fulfilled': all_fulfilled,
-                    'all_unfulfilled': all_unfulfilled,
-                    'comparative_html': comparative_html,
-                    'total_unfulfilled_count': len(unfulfilled_files),
+                    'containers_used': containers_used,
+                    'remaining_items': remaining_data.to_dict('records') if not remaining_data.empty else [],
+                    'model_images': model_images,
                     'selected_container': selected_containers_str,
                     'max_weight': total_max_weight,
                     'container_volume': total_volume
