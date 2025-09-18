@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from .forms import UploadForm
 from .models import Dimensions, Containertypes
-from .utils import optimize_packages, create_3d_model
+from .utils import optimize_packages, create_3d_model, get_color
 import pandas as pd
 import json
 import os
@@ -178,10 +178,13 @@ def upload_view(request):
                                 break
                             selected_items = remaining_data.iloc[selected_indices]
                             container_count += 1
+                            items_list = selected_items.to_dict('records')
+                            for item in items_list:
+                                item['color'] = get_color(item['queryid'], item['id'])
                             containers_used.append({
                                 'container': container,
                                 'container_number': container_count,
-                                'items': selected_items.to_dict('records'),
+                                'items': items_list,
                                 'total_weight': total_weight,
                                 'total_volume': total_volume
                             })
@@ -209,10 +212,17 @@ def upload_view(request):
 
                         summary_name = f"{scenario_name}: {num_containers} containers, {weight_util:.1f}% weight, {volume_util:.1f}% volume, {num_remaining} remaining"
 
+                        remaining_items = remaining_data.to_dict('records') if not remaining_data.empty else []
+                        for item in remaining_items:
+                            item['color'] = get_color(item['queryid'], item['id'])
+                        total_weight_remaining = sum(item['weight_tons'] for item in remaining_items) if remaining_items else 0
+                        total_volume_remaining = sum(item['volume_cbm'] for item in remaining_items) if remaining_items else 0
                         scenarios.append({
                             'name': summary_name,
                             'containers_used': containers_used,
-                            'remaining_items': remaining_data.to_dict('records') if not remaining_data.empty else [],
+                            'remaining_items': remaining_items,
+                            'total_weight_remaining': total_weight_remaining,
+                            'total_volume_remaining': total_volume_remaining,
                             'model_images': model_images
                         })
                 else:
@@ -232,10 +242,13 @@ def upload_view(request):
                                 break
                             selected_items = remaining_data.iloc[selected_indices]
                             container_count += 1
+                            items_list = selected_items.to_dict('records')
+                            for item in items_list:
+                                item['color'] = get_color(item['queryid'], item['id'])
                             containers_used.append({
                                 'container': container,
                                 'container_number': container_count,
-                                'items': selected_items.to_dict('records'),
+                                'items': items_list,
                                 'total_weight': total_weight,
                                 'total_volume': total_volume
                             })
@@ -251,10 +264,17 @@ def upload_view(request):
                         create_3d_model(float(cont['container'].length_m), float(cont['container'].breadth_m), float(cont['container'].height_m), cont['items'], output_path)
                         model_images.append(f'optimization/3d_model_0_{i}.html')
 
+                    remaining_items = remaining_data.to_dict('records') if not remaining_data.empty else []
+                    for item in remaining_items:
+                        item['color'] = get_color(item['queryid'], item['id'])
+                    total_weight_remaining = sum(item['weight_tons'] for item in remaining_items) if remaining_items else 0
+                    total_volume_remaining = sum(item['volume_cbm'] for item in remaining_items) if remaining_items else 0
                     scenarios.append({
                         'name': scenario_name,
                         'containers_used': containers_used,
-                        'remaining_items': remaining_data.to_dict('records') if not remaining_data.empty else [],
+                        'remaining_items': remaining_items,
+                        'total_weight_remaining': total_weight_remaining,
+                        'total_volume_remaining': total_volume_remaining,
                         'model_images': model_images
                     })
 

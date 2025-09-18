@@ -1,28 +1,36 @@
-# Container Optimizer UI & Logic Improvements
+# TODO: Enhance Container Optimizer UI
 
-## Backend Changes
-- [x] Update views.py: Add summary calculations (total weight, volume, utilization %)
-- [x] Update views.py: Ensure unstuffed items are properly handled and exported
-- [x] Update utils.py: Enhance create_3d_model with tooltips, legend, collision validation
-- [x] Update utils.py: Add validation for all cargo rendering
+## Core Tasks
 
-## Frontend UI Changes
-- [x] Update base.html: Improve theme consistency, fonts, padding
-- [x] Update results.html: Add summary cards at top
-- [x] Update results.html: Implement sidebar navigation
-- [x] Update results.html: Make container sections collapsible
-- [x] Update results.html: Replace tables with DataTables.js (sorting, filtering, pagination, sticky headers)
-- [x] Update results.html: Add global search bar
-- [x] Update results.html: Add warning banners for unstuffed items
-- [x] Update results.html: Improve 3D iframe integration
+### 1. Enhance 3D Model Rendering
+- [x] Improve opacity and visibility of individual cargo items
+- [x] Add better hover tooltips with item-specific details (Query ID, Package Type, Dimensions, Weight, Volume)
+- [x] Add click events to highlight corresponding table rows
+- [x] Ensure smooth rendering and no visual clutter
 
-## Static Files
-- [x] Add DataTables.js and CSS (via CDN)
-- [x] Add custom JS for interactions (search, animations) (in templates)
-- [x] Add custom CSS for styling (in templates)
+### 2. Implement Accurate, Item-Specific Tooltips
+- [x] Update hover text to show specific item details instead of container dimensions
+- [x] Ensure tooltips display: Query ID, Package Type, Dimensions, Weight, Volume
 
-## Testing & Polish
-- [x] Test UI interactions and responsiveness (DataTables handles responsiveness)
-- [x] Verify cargo visibility and warnings (warnings added, cargo visible in tables and 3D)
-- [x] Add export options (CSV, PDF, 3D screenshot)
-- [x] Implement ghost mode for overlaps (opacity toggle in 3D model)
+### 3. Establish Two-Way Interactive Linking
+- [x] Add click handler on 3D items to highlight table rows
+- [x] Add click handler on table rows to rotate/zoom 3D model to highlight item
+- [x] Implement bidirectional communication between 3D model and table
+
+### 4. Synchronize Color Schemes
+- [x] Ensure consistent color assignment between table and 3D model
+- [x] Use same color function for both visualizations
+
+### 5. Integrate Search/Filter Bar
+- [x] Add search input above data table
+- [x] Implement filtering by Query ID, Package Type, etc.
+- [x] Highlight searched items in 3D model
+- [x] Update table dynamically based on search
+
+## Implementation Steps
+
+1. [x] Update `optimization/utils.py` - Improve 3D model creation
+2. [x] Update `optimization/templates/optimization/results.html` - Add search, improve linking
+3. [ ] Test interactive features
+4. [ ] Verify color consistency
+5. [ ] Final testing and refinements

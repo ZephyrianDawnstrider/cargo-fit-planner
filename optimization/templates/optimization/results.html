@@ -23,8 +23,11 @@
                             <p><strong>Total Weight Used:</strong> {{ container.total_weight|floatformat:2 }} tons</p>
                             <p><strong>Total Volume Used:</strong> {{ container.total_volume|floatformat:2 }} CBM</p>
                         </div>
+                        <div class="mb-4">
+                            <input type="text" id="search-{{ forloop.parentloop.counter }}-{{ forloop.counter }}" placeholder="Search by Query ID, Package Type, or Cargo Type..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-gray-100 dark:bg-gray-700">
+                        </div>
                         <div class="overflow-auto max-h-96">
-                            <table class="min-w-full table-auto border-collapse border border-gray-300 text-sm">
+                            <table class="min-w-full table-auto border-collapse border border-gray-300 text-sm" data-container="{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
                                 <thead class="bg-gray-800 text-white">
                                     <tr>
                                         <th class="border border-gray-300 px-4 py-2">Query ID</th>
@@ -38,7 +41,7 @@
                                 </thead>
                                 <tbody>
                                     {% for item in container.items %}
-                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-500" data-queryid="{{ item.queryid }}" data-id="{{ item.id }}">
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-500 table-row" data-queryid="{{ item.queryid }}" data-id="{{ item.id }}" data-packagetype="{{ item.PackageType }}" data-cargotype="{{ item.CargoType }}" style="background-color: {{ item.color }}">
                                         <td class="border border-gray-300 px-4 py-2">{{ item.queryid }}</td>
                                         <td class="border border-gray-300 px-4 py-2">{{ item.id }}</td>
                                         <td class="border border-gray-300 px-4 py-2">{{ item.PackageType }}</td>
@@ -68,6 +71,10 @@
             {% if scenario.remaining_items %}
             <div class="bg-white dark:bg-gray-600 rounded p-4 mb-4">
                 <h3 class="text-xl font-medium mb-2">Unstuffed Cargo</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <p><strong>Total Weight Remaining:</strong> {{ scenario.total_weight_remaining|floatformat:2 }} tons</p>
+                    <p><strong>Total Volume Remaining:</strong> {{ scenario.total_volume_remaining|floatformat:2 }} CBM</p>
+                </div>
                 <div class="overflow-auto max-h-96">
                     <table class="min-w-full table-auto border-collapse border border-gray-300 text-sm">
                         <thead class="bg-gray-800 text-white">
@@ -83,7 +90,7 @@
                         </thead>
                         <tbody>
                             {% for item in scenario.remaining_items %}
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-500" data-queryid="{{ item.queryid }}" data-id="{{ item.id }}">
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-500" data-queryid="{{ item.queryid }}" data-id="{{ item.id }}" style="background-color: {{ item.color }}">
                                 <td class="border border-gray-300 px-4 py-2">{{ item.queryid }}</td>
                                 <td class="border border-gray-300 px-4 py-2">{{ item.id }}</td>
                                 <td class="border border-gray-300 px-4 py-2">{{ item.PackageType }}</td>
@@ -140,17 +147,24 @@
 
         // Color scheme for unique combinations of query id and id
         const colors = [
-            '#ff0026ff', '#e66b94ff', '#dd00ffff', '#6600ffff', '#8b99e7ff', '#0095ffff', '#00fff2ff', '#00ff00ff', '#e5ff00ff', '#b1ab71ff',
-            '#79725cff', '#ff9d00ff', 'rgba(124, 96, 93, 1)', '#7a2900ff', '#854242ff', '#815959ff', '#f14a4aff', '#5a5a5aff', '#381010ff', '#520000ff'
+            '#ff0026', '#e66b94', '#dd00ff', '#6600ff', '#8b99e7', '#0095ff', '#00fff2', '#00ff00', '#e5ff00', '#b1ab71',
+            '#79725c', '#ff9d00', 'rgba(124, 96, 93, 1)', '#7a2900', '#854242', '#815959', '#f14a4a', '#5a5a5a', '#381010', '#520000'
         ];
-        const colorMap = new Map();
 
         function getColor(queryId, id) {
             const key = `${queryId}-${id}`;
-            if (!colorMap.has(key)) {
-                colorMap.set(key, colors[colorMap.size % colors.length]);
+            const hashVal = Math.abs(hashString(key)) % colors.length;
+            return colors[hashVal];
+        }
+
+        function hashString(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // Convert to 32bit integer
             }
-            return colorMap.get(key);
+            return hash;
         }
 
         // Apply colors to console data tables
@@ -171,6 +185,41 @@
             row.style.backgroundColor = getColor(queryId, id);
         });
 
+        // Search functionality
+        document.querySelectorAll('input[id^="search-"]').forEach(input => {
+            input.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const table = this.closest('.bg-white').querySelector('table');
+                const rows = table.querySelectorAll('tbody tr');
+                rows.forEach(row => {
+                    const queryId = row.getAttribute('data-queryid').toLowerCase();
+                    const packageType = row.getAttribute('data-packagetype').toLowerCase();
+                    const cargoType = row.getAttribute('data-cargotype').toLowerCase();
+                    if (queryId.includes(searchTerm) || packageType.includes(searchTerm) || cargoType.includes(searchTerm)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+        });
+
+        // Table row click to highlight in 3D
+        document.querySelectorAll('.table-row').forEach(row => {
+            row.addEventListener('click', function() {
+                const queryid = this.getAttribute('data-queryid');
+                const id = this.getAttribute('data-id');
+                const table = this.closest('table');
+                const containerId = table.getAttribute('data-container');
+                const iframes = document.querySelectorAll('iframe');
+                // Assume iframes are in order, find the corresponding one
+                const index = Array.from(document.querySelectorAll('table[data-container]')).indexOf(table);
+                if (iframes[index]) {
+                    iframes[index].contentWindow.postMessage({type: 'highlight', queryid: queryid, id: id}, '*');
+                }
+            });
+        });
+
         // Listen for messages from iframe
         window.addEventListener('message', function(event) {
             if (event.data.type === 'highlight') {
@@ -181,6 +230,13 @@
             } else if (event.data.type === 'unhighlight') {
                 document.querySelectorAll('tr.highlighted').forEach(row => {
                     row.classList.remove('highlighted');
+                });
+            } else if (event.data.type === 'click') {
+                const { queryid, id } = event.data;
+                // Highlight the table row
+                document.querySelectorAll(`tr[data-queryid="${queryid}"][data-id="${id}"]`).forEach(row => {
+                    row.classList.add('highlighted');
+                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 });
             }
         });

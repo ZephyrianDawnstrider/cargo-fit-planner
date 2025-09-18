@@ -16,7 +16,7 @@ def get_color(queryid, id_val):
     hash_val = abs(hash(key)) % len(colors)
     return colors[hash_val]
 
-def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio=0.6, min_volume_ratio=0.6):
+def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio=0.6, min_volume_ratio=0.8):
     required_columns = ['weight_tons', 'volume_cbm']
     if not all(col in data.columns for col in required_columns):
         return [], 0, 0
@@ -69,7 +69,7 @@ def create_3d_model(container_length, container_breadth, container_height, items
     # Define rules for each package type
     rules = {
         'General Goods': {'can_stack_on': True, 'must_be_on_top': False, 'near_exit': False, 'can_rotate': True},
-        'Dangerous Goods': {'can_stack_on': False, 'must_be_on_top': False, 'near_exit': True, 'can_rotate': False},
+        'Dangerous Goods': {'can_stack_on': False, 'must_be_on_top': True, 'near_exit': True, 'can_rotate': False},
         'Over-Dimension Cargo': {'can_stack_on': True, 'must_be_on_top': False, 'near_exit': False, 'can_rotate': True},
         'Breakable Goods': {'can_stack_on': False, 'must_be_on_top': True, 'near_exit': False, 'can_rotate': False},
         'Temperature-Controlled Goods': {'can_stack_on': False, 'must_be_on_top': False, 'near_exit': True, 'can_rotate': False},
@@ -107,7 +107,7 @@ def create_3d_model(container_length, container_breadth, container_height, items
         cargo_type = item.get('CargoType', 'General Goods')
         rule = rules.get(cargo_type, rules['General Goods'])
 
-        color = get_color(item.get('queryid'), item.get('id'))
+        color = item.get('color', get_color(item.get('queryid'), item.get('id')))
 
         # Find best position
         best_x, best_y, best_z = None, None, float('inf')
@@ -153,8 +153,10 @@ def create_3d_model(container_length, container_breadth, container_height, items
                 j=[1, 2, 3, 5, 5, 6, 6, 7, 1, 2, 2, 6],
                 k=[2, 3, 0, 6, 6, 7, 7, 2, 5, 5, 3, 3],
                 color=color,
-                opacity=0.7,
-                name=f"Q{item.get('queryid')}-I{item.get('id')} ({cargo_type}) L:{l:.1f}m B:{b:.1f}m H:{h:.1f}m W:{item.get('weight_tons', 0):.3f}t"
+                opacity=0.8,
+                hoverinfo='text',
+                hovertext=f"Query ID: {item.get('queryid')}<br>ID: {item.get('id')}<br>Package Type: {item.get('PackageType')}<br>Cargo Type: {cargo_type}<br>Dimensions: {l*100:.0f}×{b*100:.0f}×{h*100:.0f} cm<br>Weight: {item.get('weight_tons', 0):.3f} tons<br>Volume: {item.get('volume_cbm', 0):.3f} CBM",
+                name=f"Q{item.get('queryid')}-I{item.get('id')}"
             ))
             # Update height_map
             new_height = best_z + h
@@ -172,14 +174,14 @@ def create_3d_model(container_length, container_breadth, container_height, items
         aspectmode='data'
     ))
 
-    # Add hover event to highlight table rows
+    # Add hover and click events to highlight table rows
     hover_script = """
     <script>
     var plotlyDiv = document.querySelector('.plotly-graph-div');
     if (plotlyDiv) {
         plotlyDiv.on('plotly_hover', function(data) {
             if (data.points && data.points.length > 0) {
-                var point = data.points[0];
+                var point =  data.points[0];
                 var name = point.data.name;
                 if (name) {
                     var match = name.match(/Q(\\d+)-I(\\d+)/);
@@ -193,6 +195,36 @@ def create_3d_model(container_length, container_breadth, container_height, items
         });
         plotlyDiv.on('plotly_unhover', function(data) {
             window.parent.postMessage({type: 'unhighlight'}, '*');
+        });
+        plotlyDiv.on('plotly_click', function(data) {
+            if (data.points && data.points.length > 0) {
+                var point = data.points[0];
+                var name = point.data.name;
+                if (name) {
+                    var match = name.match(/Q(\\d+)-I(\\d+)/);
+                    if (match) {
+                        var queryid = match[1];
+                        var id = match[2];
+                        window.parent.postMessage({type: 'click', queryid: queryid, id: id}, '*');
+                    }
+                }
+            }
+        });
+
+        // Listen for messages from parent
+        window.addEventListener('message', function(event) {
+            if (event.data.type === 'highlight') {
+                const { queryid, id } = event.data;
+                // Find and highlight the trace
+                const traces = plotlyDiv.data;
+                traces.forEach((trace, index) => {
+                    if (trace.name === `Q${queryid}-I${id}`) {
+                        Plotly.restyle(plotlyDiv, {opacity: 1}, [index]);
+                    } else {
+                        Plotly.restyle(plotlyDiv, {opacity: 0.3}, [index]);
+                    }
+                });
+            }
         });
     }
     </script>
