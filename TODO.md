@@ -1,3 +1,3 @@
-- [x] Update optimize_packages in optimization/utils.py: Add min_volume_ratio parameter (default 0.0) and add solver.Add(total_volume >= min_volume_ratio * carry_volume)
-- [ ] Update optimization/views.py: Modify calls to optimize_packages to pass min_volume_ratio=0.7
-- [x] Test the changes by running the Django server and verifying the optimization respects the minimum volume constraints
+- [x] Update volume and dimension calculations in views.py for Dangerous Goods and Over-Dimension Cargo
+- [x] Modify create_3d_model in utils.py to apply all handling rules
+- [x] Test the changes by running the Django app

@@ -184,8 +184,10 @@
                 const categorytypeid = containerType === 'console' ? 7 : 8;
                 const sizeSelect = $('#id_container_size');
 
-                // Clear current options
+                // Clear current options and hide select all
                 sizeSelect.empty();
+                $('#select-all-sizes').prop('checked', false);
+                $('#select-all-sizes-container').hide();
 
                 if (containerType) {
                     // Fetch container sizes from server
@@ -199,6 +201,10 @@
                                     sizeSelect.append(option);
                                 });
                                 sizeSelect.trigger('change'); // refresh Select2
+                                if (containerType === 'closed_body_truck') {
+                                    $('#select-all-sizes-container').show();
+                                    window.containerSizes = data.sizes;
+                                }
                             }
                         },
                         error: function() {
@@ -207,6 +213,15 @@
                     });
                 }
             });
+        });
+
+        // Select all sizes checkbox handler
+        $('#select-all-sizes').on('change', function() {
+            if (this.checked) {
+                $('#id_container_size').val(window.containerSizes).trigger('change');
+            } else {
+                $('#id_container_size').val([]).trigger('change');
+            }
         });
 
         // Form submit handler for loading spinner
@@ -274,11 +289,11 @@
                                             <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-white">Cargo Type</th>
                                             <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-white">Dimensions (L×W×H)</th>
                                             <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-white">Dimensions Unit</th>
-                                            <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-white">Unit</th>
+                                            {% comment %} <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-white">Unit</th> {% endcomment %}
                                             <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-white">Weight/Unit</th>
                                             <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-white">Units</th>
                                             <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-white">Base Weight</th>
-                                            <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-white">Dimension Expanded</th>
+                                            {% comment %} <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-white">Dimension Expanded</th> {% endcomment %}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -289,13 +304,13 @@
                                             <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.id }}</td>
                                             <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.PackageType }}</td>
                                             <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.CargoType }}</td>
-                                            <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.Lenght }}.00 × {{ dimension.Breadth }}.00 × {{ dimension.Height }}.00 CM</td>
+                                            <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.Lenght }} × {{ dimension.Breadth }}× {{ dimension.Height }}</td>
                                             <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.dimensionunit }}</td>
-                                            <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">KG kg</td>
-                                            <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.WeightPerUnit }}.00</td>
-                                            <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.TotalUnits }}.00</td>
-                                            <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.BasePackageWeight }}.00 kg</td>
-                                            <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">No</td>
+                                            {% comment %} <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.Unit }}</td> {% endcomment %}
+                                            <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.WeightPerUnit }}</td>
+                                            <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.TotalUnits }}</td>
+                                            <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.BasePackageWeight }}kg</td>
+                                            {% comment %} <td class="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-white">{{ dimension.dimensionexpanded }}</td> {% endcomment %}
                                         </tr>
                                         {% endfor %}
                                     </tbody>
@@ -342,14 +357,20 @@
                     </div>
                     <div class="mb-4">
                         <label for="{{ form.container_size.id_for_label }}" class="block text-sm font-medium text-gray-800 dark:text-white">{{ form.container_size.label }}</label>
+                        <div id="select-all-sizes-container" style="display: none;">
+                            <label class="flex items-center mb-2">
+                                <input type="checkbox" id="select-all-sizes">
+                                <span class="ml-2 text-sm text-gray-800 dark:text-white">Select All Sizes</span>
+                            </label>
+                        </div>
                         {{ form.container_size }}
                     </div>
-                    <div class="mb-4">
+                    {% comment %} <div class="mb-4">
                         <label class="flex items-center">
                             {{ form.include_cost }}
                             <span class="ml-2 text-sm text-gray-800 dark:text-white">Include Cost Calculation</span>
                         </label>
-                    </div>
+                    </div> {% endcomment %}
                     <button type="submit" id="submit-btn" class="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white font-bold py-3 px-4 rounded-lg transition-all flex items-center justify-center">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>

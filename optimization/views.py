@@ -74,7 +74,7 @@ def upload_view(request):
                 # Convert to DataFrame for processing
                 data = pd.DataFrame(list(dimensions.values(
                     'queryid', 'id', 'Lenght', 'Breadth', 'Height', 'WeightPerUnit',
-                    'TotalUnits', 'PackageType', 'CargoType', 'BasePackageWeight'
+                    'TotalUnits', 'PackageType', 'CargoType', 'BasePackageWeight', 'dimensionunit'
                 )))
 
                 if data.empty:
@@ -87,20 +87,77 @@ def upload_view(request):
                 # Expand data by TotalUnits
                 selected_data_expanded = []
                 for index, row in selected_data.iterrows():
-                    units = int(row['TotalUnits'])
+                    try:
+                        units = int(row['TotalUnits'])
+                        if units <= 0:
+                            logger.warning(f"Skipping row {index}: TotalUnits = {row['TotalUnits']} (not positive)")
+                            continue
+                    except (ValueError, TypeError):
+                        logger.warning(f"Skipping row {index}: Invalid TotalUnits = {row['TotalUnits']}")
+                        continue
+                    lenght = float(row['Lenght'])
+                    breadth = float(row['Breadth'])
+                    height = float(row['Height'])
+                    dimensionunit = row['dimensionunit'].lower()
+                    weight_unit = row['WeightPerUnit'].lower() if row['WeightPerUnit'] else 'kg'
+                    base_weight = float(row['BasePackageWeight'])
+                    cargo_type = row['CargoType']
+
+                    # Convert dimensions to cm
+                    if dimensionunit == 'm' or dimensionunit == 'meter':
+                        lenght *= 100
+                        breadth *= 100
+                        height *= 100
+                    elif dimensionunit == 'inch' or dimensionunit == 'in':
+                        lenght *= 2.54
+                        breadth *= 2.54
+                        height *= 2.54
+                    elif dimensionunit == 'yard' or dimensionunit == 'yd':
+                        lenght *= 91.44
+                        breadth *= 91.44
+                        height *= 91.44
+                    elif dimensionunit == 'feet' or dimensionunit == 'ft':
+                        lenght *= 30.48
+                        breadth *= 30.48
+                        height *= 30.48
+                    # Assume cm if not specified or unknown
+
+                    # Convert weight to kg
+                    if weight_unit in ['ton', 'tons', 't']:
+                        base_weight *= 1000
+                    elif weight_unit == 'g' or weight_unit == 'gram':
+                        base_weight /= 1000
+                    elif weight_unit == 'lb' or weight_unit == 'pound':
+                        base_weight *= 0.453592
+                    # Assume kg if not specified or unknown
+
+                    # Adjust dimensions based on type
+                    if cargo_type == 'Dangerous Goods':
+                        lenght += 10  # +10 cm
+                        breadth += 10
+                        height += 10
+                    elif cargo_type == 'Over-Dimension Cargo':
+                        lenght *= 1.1  # +10%
+                        breadth *= 1.1
+                        height *= 1.1
+
+                    volume_cbm = (lenght * breadth * height) / 1000000
+                    weight_per_unit_kg = base_weight / units
+                    weight_tons = weight_per_unit_kg / 1000
+
                     for _ in range(units):
                         selected_data_expanded.append({
                             'queryid': row['queryid'],
                             'id': row['id'],
-                            'Lenght': row['Lenght'],
-                            'Breadth': row['Breadth'],
-                            'Height': row['Height'],
+                            'Lenght': lenght,
+                            'Breadth': breadth,
+                            'Height': height,
                             'WeightPerUnit': row['WeightPerUnit'],
                             'PackageType': row['PackageType'],
                             'CargoType': row['CargoType'],
                             'BasePackageWeight': row['BasePackageWeight'],
-                        'weight_tons': (float(row['BasePackageWeight']) / float(row['TotalUnits'])) / 1000,
-                        'volume_cbm': (float(row['Lenght']) * float(row['Breadth']) * (float(row['Height']) + (10 if row['CargoType'] == 'Dangerous Goods' else 0))) / 1000000
+                            'weight_tons': weight_tons,
+                            'volume_cbm': volume_cbm
                         })
                 selected_data_expanded = pd.DataFrame(selected_data_expanded)
                 logger.info(f"Expanded data to {len(selected_data_expanded)} individual items from {len(selected_data)} selected records.")

@@ -66,8 +66,32 @@ def create_3d_model(container_length, container_breadth, container_height, items
         name='Container'
     ))
 
-    # Sort items by volume descending for better packing
-    items.sort(key=lambda x: float(x.get('Lenght', 1)) * float(x.get('Breadth', 1)) * float(x.get('Height', 1)), reverse=True)
+    # Define rules for each package type
+    rules = {
+        'General Goods': {'can_stack_on': True, 'must_be_on_top': False, 'near_exit': False, 'can_rotate': True},
+        'Dangerous Goods': {'can_stack_on': False, 'must_be_on_top': False, 'near_exit': True, 'can_rotate': False},
+        'Over-Dimension Cargo': {'can_stack_on': True, 'must_be_on_top': False, 'near_exit': False, 'can_rotate': True},
+        'Breakable Goods': {'can_stack_on': False, 'must_be_on_top': True, 'near_exit': False, 'can_rotate': False},
+        'Temperature-Controlled Goods': {'can_stack_on': False, 'must_be_on_top': False, 'near_exit': True, 'can_rotate': False},
+        'Non-Stackable Cargo': {'can_stack_on': False, 'must_be_on_top': False, 'near_exit': False, 'can_rotate': True},
+        'Non-Tiltable Cargo': {'can_stack_on': True, 'must_be_on_top': False, 'near_exit': False, 'can_rotate': False}
+    }
+
+    # Sort items: breakable last, dangerous/temp first, then by volume descending
+    def sort_key(item):
+        cargo_type = item.get('CargoType', 'General Goods')
+        rule = rules.get(cargo_type, rules['General Goods'])
+        priority = 0
+        if rule['must_be_on_top']:
+            priority = 2  # last
+        elif rule['near_exit']:
+            priority = 0  # first
+        else:
+            priority = 1
+        volume = float(item.get('Lenght', 1)) * float(item.get('Breadth', 1)) * float(item.get('Height', 1))
+        return (priority, -volume)  # higher priority first, then larger volume first
+
+    items.sort(key=sort_key)
 
     # Initialize height map for stacking
     grid_size = 0.1  # 10 cm grid
@@ -80,8 +104,7 @@ def create_3d_model(container_length, container_breadth, container_height, items
         b = float(item.get('Breadth', 1)) / 100
         h = float(item.get('Height', 1)) / 100
         cargo_type = item.get('CargoType', 'General Goods')
-        if cargo_type == 'Dangerous Goods':
-            h += 0.1  # 10 cm extra
+        rule = rules.get(cargo_type, rules['General Goods'])
 
         color = get_color(item.get('queryid'), item.get('id'))
 
@@ -91,8 +114,8 @@ def create_3d_model(container_length, container_breadth, container_height, items
         x_range = range(0, int((container_length - l) / step) + 1)
         y_range = range(0, int((container_breadth - b) / step) + 1)
 
-        # For dangerous goods, prefer low x
-        if cargo_type == 'Dangerous Goods':
+        # For near_exit, prefer low x
+        if rule['near_exit']:
             x_range = sorted(x_range, key=lambda ix: ix * step)  # low x first
 
         for ix in x_range:
@@ -109,8 +132,11 @@ def create_3d_model(container_length, container_breadth, container_height, items
                     for gy in range(start_gy, end_gy + 1):
                         if 0 <= gx < num_x and 0 <= gy < num_y:
                             max_z_here = max(max_z_here, height_map[gx][gy])
+                # For must_be_on_top, place at highest z
+                if rule['must_be_on_top']:
+                    max_z_here = container_height - h  # place on top
                 # For non-stackable, only at z=0
-                if cargo_type == 'Non-Stackable' and max_z_here > 0:
+                elif not rule['can_stack_on'] and max_z_here > 0:
                     continue
                 if max_z_here + h <= container_height and max_z_here < best_z:
                     best_z = max_z_here
@@ -128,13 +154,16 @@ def create_3d_model(container_length, container_breadth, container_height, items
                 k=[2, 3, 0, 6, 6, 7, 7, 2, 5, 5, 3, 3],
                 color=color,
                 opacity=0.7,
-                name=f"Q{item.get('queryid')}-I{item.get('id')} ({cargo_type})"
+                name=f"Q{item.get('queryid')}-I{item.get('id')} ({cargo_type}) L:{l:.1f}m B:{b:.1f}m H:{h:.1f}m W:{item.get('weight_tons', 0):.3f}t"
             ))
             # Update height_map
+            new_height = best_z + h
+            if not rule['can_stack_on']:
+                new_height = container_height  # prevent stacking on top
             for gx in range(int(best_x / grid_size), int((best_x + l) / grid_size) + 1):
                 for gy in range(int(best_y / grid_size), int((best_y + b) / grid_size) + 1):
                     if 0 <= gx < num_x and 0 <= gy < num_y:
-                        height_map[gx][gy] = best_z + h
+                        height_map[gx][gy] = new_height
 
     fig.update_layout(scene=dict(
         xaxis_title='Length (m)',
