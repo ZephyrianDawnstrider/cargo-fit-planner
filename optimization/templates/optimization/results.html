@@ -117,6 +117,13 @@
             </button>
         </div>
 
+    <style>
+        .highlighted {
+            background-color: yellow !important;
+            border: 2px solid red !important;
+        }
+    </style>
+
     <script>
         // Back to top button
         const backToTopBtn = document.getElementById('back-to-top');
@@ -162,6 +169,20 @@
             const queryId = row.getAttribute('data-queryid');
             const id = row.getAttribute('data-id');
             row.style.backgroundColor = getColor(queryId, id);
+        });
+
+        // Listen for messages from iframe
+        window.addEventListener('message', function(event) {
+            if (event.data.type === 'highlight') {
+                const { queryid, id } = event.data;
+                document.querySelectorAll(`tr[data-queryid="${queryid}"][data-id="${id}"]`).forEach(row => {
+                    row.classList.add('highlighted');
+                });
+            } else if (event.data.type === 'unhighlight') {
+                document.querySelectorAll('tr.highlighted').forEach(row => {
+                    row.classList.remove('highlighted');
+                });
+            }
         });
     </script>
 

@@ -16,7 +16,7 @@ def get_color(queryid, id_val):
     hash_val = abs(hash(key)) % len(colors)
     return colors[hash_val]
 
-def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio=0.5):
+def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio=0.6, min_volume_ratio=0.6):
     required_columns = ['weight_tons', 'volume_cbm']
     if not all(col in data.columns for col in required_columns):
         return [], 0, 0
@@ -34,6 +34,7 @@ def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio=0.5):
     solver.Add(total_weight <= carry_capacity)
     solver.Add(total_volume <= carry_volume)
     solver.Add(total_weight >= min_weight_ratio * carry_capacity)
+    solver.Add(total_volume >= min_volume_ratio * carry_volume)
 
     # Maximize number of packages
     objective = solver.Sum(x[i] for i in range(num_packages))
@@ -142,4 +143,33 @@ def create_3d_model(container_length, container_breadth, container_height, items
         aspectmode='data'
     ))
 
-    fig.write_html(output_path.replace('.png', '.html'))
+    # Add hover event to highlight table rows
+    hover_script = """
+    <script>
+    var plotlyDiv = document.querySelector('.plotly-graph-div');
+    if (plotlyDiv) {
+        plotlyDiv.on('plotly_hover', function(data) {
+            if (data.points && data.points.length > 0) {
+                var point = data.points[0];
+                var name = point.data.name;
+                if (name) {
+                    var match = name.match(/Q(\\d+)-I(\\d+)/);
+                    if (match) {
+                        var queryid = match[1];
+                        var id = match[2];
+                        window.parent.postMessage({type: 'highlight', queryid: queryid, id: id}, '*');
+                    }
+                }
+            }
+        });
+        plotlyDiv.on('plotly_unhover', function(data) {
+            window.parent.postMessage({type: 'unhighlight'}, '*');
+        });
+    }
+    </script>
+    """
+
+    html_content = fig.to_html()
+    html_content = html_content.replace('</body>', hover_script + '</body>')
+    with open(output_path.replace('.png', '.html'), 'w', encoding='utf-8') as f:
+        f.write(html_content)
