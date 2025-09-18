@@ -142,7 +142,7 @@ def upload_view(request):
                         height *= 1.1
 
                     volume_cbm = (lenght * breadth * height) / 1000000
-                    weight_per_unit_kg = base_weight / units
+                    weight_per_unit_kg = base_weight
                     weight_tons = weight_per_unit_kg / 1000
 
                     for _ in range(units):

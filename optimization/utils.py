@@ -73,16 +73,17 @@ def create_3d_model(container_length, container_breadth, container_height, items
         'Over-Dimension Cargo': {'can_stack_on': True, 'must_be_on_top': False, 'near_exit': False, 'can_rotate': True},
         'Breakable Goods': {'can_stack_on': False, 'must_be_on_top': True, 'near_exit': False, 'can_rotate': False},
         'Temperature-Controlled Goods': {'can_stack_on': False, 'must_be_on_top': False, 'near_exit': True, 'can_rotate': False},
-        'Non-Stackable Cargo': {'can_stack_on': False, 'must_be_on_top': False, 'near_exit': False, 'can_rotate': True},
+        # 'Non-Stackable Cargo': {'can_stack_on': False, 'must_be_on_top': True, 'near_exit': False, 'can_rotate': True},
+        'Non-Stackable': {'can_stack_on': False, 'must_be_on_top': True, 'near_exit': False, 'can_rotate': True},
         'Non-Tiltable Cargo': {'can_stack_on': True, 'must_be_on_top': False, 'near_exit': False, 'can_rotate': False}
     }
 
-    # Sort items: breakable last, dangerous/temp first, then by volume descending
+    # Sort items: breakable and non-stackable last, dangerous/temp first, then by volume descending
     def sort_key(item):
         cargo_type = item.get('CargoType', 'General Goods')
         rule = rules.get(cargo_type, rules['General Goods'])
         priority = 0
-        if rule['must_be_on_top']:
+        if rule['must_be_on_top'] or not rule['can_stack_on']:
             priority = 2  # last
         elif rule['near_exit']:
             priority = 0  # first
@@ -132,17 +133,16 @@ def create_3d_model(container_length, container_breadth, container_height, items
                     for gy in range(start_gy, end_gy + 1):
                         if 0 <= gx < num_x and 0 <= gy < num_y:
                             max_z_here = max(max_z_here, height_map[gx][gy])
-                # For must_be_on_top, place at highest z
+                # For must_be_on_top, place at highest z only if not on non-stackable
                 if rule['must_be_on_top']:
-                    max_z_here = container_height - h  # place on top
-                # For non-stackable, only at z=0
-                elif not rule['can_stack_on'] and max_z_here > 0:
-                    continue
+                    if max_z_here < container_height:
+                        max_z_here = container_height - h  # place on top
+                    else:
+                        continue  # can't place on non-stackable
                 if max_z_here + h <= container_height and max_z_here < best_z:
                     best_z = max_z_here
                     best_x = x
                     best_y = y
-
         if best_x is not None:
             # Place item
             fig.add_trace(go.Mesh3d(
