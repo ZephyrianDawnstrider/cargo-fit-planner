@@ -188,7 +188,6 @@ def upload_view(request):
                                 'total_weight': total_weight,
                                 'total_volume': total_volume
                             })
-                            logger.info(f"Packed container {container.name} - {container.size} instance {container_count} with {len(selected_items)} items, weight {total_weight:.2f} tons, volume {total_volume:.2f} CBM.")
                             remaining_data = remaining_data.drop(selected_indices).reset_index(drop=True)
                         logger.info(f"Scenario '{scenario_name}' complete. Used {len(containers_used)} containers. Remaining items: {len(remaining_data)}.")
 
@@ -197,7 +196,19 @@ def upload_view(request):
                         for i, cont in enumerate(containers_used):
                             output_path = f'optimization/static/optimization/3d_model_{scenario_idx}_{i}.html'
                             os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                            create_3d_model(float(cont['container'].length_m), float(cont['container'].breadth_m), float(cont['container'].height_m), cont['items'], output_path)
+                            original_items = cont['items'][:]  # copy
+                            placed_items = create_3d_model(float(cont['container'].length_m), float(cont['container'].breadth_m), float(cont['container'].height_m), cont['items'], output_path)
+                            # Filter to only placed items
+                            cont['items'] = placed_items
+                            # Recalculate totals
+                            cont['total_weight'] = sum(item['weight_tons'] for item in placed_items)
+                            cont['total_volume'] = sum(item['volume_cbm'] for item in placed_items)
+                            logger.info(f"Packed container {cont['container'].name} - {cont['container'].size} instance {cont['container_number']} with {len(placed_items)} items, weight {cont['total_weight']:.2f} tons, volume {cont['total_volume']:.2f} CBM.")
+                            # Find unplaced items and add to remaining
+                            unplaced_items = [item for item in original_items if item not in placed_items]
+                            if unplaced_items:
+                                unplaced_df = pd.DataFrame(unplaced_items)
+                                remaining_data = pd.concat([remaining_data, unplaced_df], ignore_index=True)
                             model_images.append(f'optimization/3d_model_{scenario_idx}_{i}.html')
 
                         # Calculate summary
@@ -252,7 +263,6 @@ def upload_view(request):
                                 'total_weight': total_weight,
                                 'total_volume': total_volume
                             })
-                            logger.info(f"Packed container {container.name} - {container.size} instance {container_count} with {len(selected_items)} items, weight {total_weight:.2f} tons, volume {total_volume:.2f} CBM.")
                             remaining_data = remaining_data.drop(selected_indices).reset_index(drop=True)
                     logger.info(f"Scenario '{scenario_name}' complete. Used {len(containers_used)} containers. Remaining items: {len(remaining_data)}.")
 
@@ -261,7 +271,19 @@ def upload_view(request):
                     for i, cont in enumerate(containers_used):
                         output_path = f'optimization/static/optimization/3d_model_0_{i}.html'
                         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                        create_3d_model(float(cont['container'].length_m), float(cont['container'].breadth_m), float(cont['container'].height_m), cont['items'], output_path)
+                        original_items = cont['items'][:]  # copy
+                        placed_items = create_3d_model(float(cont['container'].length_m), float(cont['container'].breadth_m), float(cont['container'].height_m), cont['items'], output_path)
+                        # Filter to only placed items
+                        cont['items'] = placed_items
+                        # Recalculate totals
+                        cont['total_weight'] = sum(item['weight_tons'] for item in placed_items)
+                        cont['total_volume'] = sum(item['volume_cbm'] for item in placed_items)
+                        logger.info(f"Packed container {cont['container'].name} - {cont['container'].size} instance {cont['container_number']} with {len(placed_items)} items, weight {cont['total_weight']:.2f} tons, volume {cont['total_volume']:.2f} CBM.")
+                        # Find unplaced items and add to remaining
+                        unplaced_items = [item for item in original_items if item not in placed_items]
+                        if unplaced_items:
+                            unplaced_df = pd.DataFrame(unplaced_items)
+                            remaining_data = pd.concat([remaining_data, unplaced_df], ignore_index=True)
                         model_images.append(f'optimization/3d_model_0_{i}.html')
 
                     remaining_items = remaining_data.to_dict('records') if not remaining_data.empty else []

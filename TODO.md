@@ -1,9 +1,8 @@
-# TODO: Fix Box Overlaps in 3D Visualization
+# TODO: Fix Consistency Between Stuffing Table and 3D Model
 
 ## Tasks
-- [x] Add a list to track placed boxes with positions and dimensions
-- [x] Implement overlap detection function for two boxes
-- [x] Modify placement logic to check for overlaps before placing
-- [x] Ensure non-stackable items don't overlap in x-y plane
-- [x] Update height_map to prevent invalid placements
-- [ ] Test the changes to ensure no overlaps in visualization
+- [x] Modify create_3d_model in utils.py to return list of placed items
+- [x] Update views.py to filter packed items to only placed ones, move unplaced to remaining
+- [x] Recalculate total weight and volume for containers after filtering
+- [ ] Test with provided data to ensure non-stackable cargo is handled correctly
+- [ ] Verify item counts match between table and 3D model

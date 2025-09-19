@@ -16,7 +16,7 @@ def get_color(queryid, id_val):
     hash_val = abs(hash(key)) % len(colors)
     return colors[hash_val]
 
-def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio=0.6, min_volume_ratio=0.8):
+def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio=0.6, min_volume_ratio=0.7):
     required_columns = ['weight_tons', 'volume_cbm']
     if not all(col in data.columns for col in required_columns):
         return [], 0, 0
@@ -51,6 +51,7 @@ def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio=0.6, 
         return [], 0, 0
 
 def create_3d_model(container_length, container_breadth, container_height, items, output_path):
+    placed_items = []
     fig = go.Figure()
 
     # Draw container
@@ -100,6 +101,7 @@ def create_3d_model(container_length, container_breadth, container_height, items
 
     # List to track placed boxes for collision detection
     placed_boxes = []
+    packing_order = 0
 
     def boxes_overlap(box1, box2):
         """Check if two boxes overlap in 3D space."""
@@ -175,6 +177,8 @@ def create_3d_model(container_length, container_breadth, container_height, items
                         best_x = x
                         best_y = y
         if best_x is not None:
+            packing_order += 1
+            placed_items.append(item)
             # Place item
             fig.add_trace(go.Mesh3d(
                 x=[best_x, best_x+l, best_x+l, best_x, best_x, best_x+l, best_x+l, best_x],
@@ -186,9 +190,18 @@ def create_3d_model(container_length, container_breadth, container_height, items
                 color=color,
                 opacity=1.0,
                 hoverinfo='text',
-                hovertext=f"Query ID: {item.get('queryid')}<br>ID: {item.get('id')}<br>Package Type: {item.get('PackageType')}<br>Cargo Type: {cargo_type}<br>Dimensions: {l*100:.0f}×{b*100:.0f}×{h*100:.0f} cm<br>Weight: {item.get('weight_tons', 0):.3f} tons<br>Volume: {item.get('volume_cbm', 0):.3f} CBM",
+                hovertext=f"Packing Order: {packing_order}<br>Query ID: {item.get('queryid')}<br>ID: {item.get('id')}<br>Package Type: {item.get('PackageType')}<br>Cargo Type: {cargo_type}<br>Dimensions: {l*100:.0f}×{b*100:.0f}×{h*100:.0f} cm<br>Weight: {item.get('weight_tons', 0):.3f} tons<br>Volume: {item.get('volume_cbm', 0):.3f} CBM",
                 name=f"Q{item.get('queryid')}-I{item.get('id')}"
             ))
+
+            if animation:
+                # Save animation step
+                fig.update_layout(title=f"Packing Step {packing_order}")
+                step_path = output_path.replace('.html', f'_step_{packing_order}.html')
+                html_content = fig.to_html()
+                html_content = html_content.replace('</body>', hover_script + '</body>')
+                with open(step_path, 'w', encoding='utf-8') as f:
+                    f.write(html_content)
             # Update height_map
             new_height = best_z + h
             if not rule['can_stack_on']:
@@ -204,13 +217,6 @@ def create_3d_model(container_length, container_breadth, container_height, items
                 'ymin': best_y, 'ymax': best_y + b,
                 'zmin': best_z, 'zmax': best_z + h
             })
-
-    fig.update_layout(scene=dict(
-        xaxis_title='Length (m)',
-        yaxis_title='Breadth (m)',
-        zaxis_title='Height (m)',
-        aspectmode='data'
-    ))
 
     # Add hover and click events to highlight table rows
     hover_script = """
@@ -268,7 +274,15 @@ def create_3d_model(container_length, container_breadth, container_height, items
     </script>
     """
 
+    fig.update_layout(scene=dict(
+        xaxis_title='Length (m)',
+        yaxis_title='Breadth (m)',
+        zaxis_title='Height (m)',
+        aspectmode='data'
+    ))
+
     html_content = fig.to_html()
     html_content = html_content.replace('</body>', hover_script + '</body>')
     with open(output_path.replace('.png', '.html'), 'w', encoding='utf-8') as f:
         f.write(html_content)
+    return placed_items

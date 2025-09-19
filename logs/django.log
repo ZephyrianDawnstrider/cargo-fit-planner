@@ -3232,3 +3232,466 @@ WARNING 2025-09-19 13:09:27,742 log 26284 10044 Not Found: /favicon.ico
 WARNING 2025-09-19 13:09:27,743 basehttp 26284 10044 "GET /favicon.ico HTTP/1.1" 404 2499
 INFO 2025-09-19 13:09:53,709 autoreload 26284 19792 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
 INFO 2025-09-19 13:09:55,654 autoreload 14828 20284 Watching for file changes with StatReloader
+INFO 2025-09-19 13:14:19,723 views 14828 22360 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 13:14:19,726 views 14828 22360 Starting scenario 'Selected Containers' with 89 items into 1 container types.
+INFO 2025-09-19 13:14:19,765 views 14828 22360 Packed container Closed Body Truck - 20 FT instance 1 with 60 items, weight 8.94 tons, volume 34.54 CBM.
+INFO 2025-09-19 13:14:19,822 views 14828 22360 Packed container Closed Body Truck - 20 FT instance 2 with 14 items, weight 8.94 tons, volume 34.82 CBM.
+INFO 2025-09-19 13:14:19,836 views 14828 22360 Scenario 'Selected Containers' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 13:14:23,699 basehttp 14828 22360 "POST / HTTP/1.1" 200 103354
+INFO 2025-09-19 13:14:24,432 basehttp 14828 22360 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4811805
+INFO 2025-09-19 13:14:27,791 basehttp 14828 20392 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781654
+WARNING 2025-09-19 13:14:29,551 log 14828 20392 Not Found: /favicon.ico
+WARNING 2025-09-19 13:14:29,564 basehttp 14828 20392 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 13:16:41,481 autoreload 14828 20284 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 13:16:43,340 autoreload 11884 21472 Watching for file changes with StatReloader
+INFO 2025-09-19 13:18:51,528 views 11884 22732 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 13:18:51,530 views 11884 22732 Starting scenario 'Selected Containers' with 89 items into 1 container types.
+INFO 2025-09-19 13:18:51,567 views 11884 22732 Packed container Closed Body Truck - 20 FT instance 1 with 60 items, weight 8.94 tons, volume 34.54 CBM.
+INFO 2025-09-19 13:18:51,699 views 11884 22732 Packed container Closed Body Truck - 20 FT instance 2 with 14 items, weight 8.94 tons, volume 34.82 CBM.
+INFO 2025-09-19 13:18:51,733 views 11884 22732 Scenario 'Selected Containers' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 13:18:58,603 basehttp 11884 22732 "POST / HTTP/1.1" 200 103315
+INFO 2025-09-19 13:19:00,607 basehttp 11884 22732 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813374
+INFO 2025-09-19 13:19:00,944 basehttp 11884 18344 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781877
+WARNING 2025-09-19 13:19:04,584 log 11884 18344 Not Found: /favicon.ico
+WARNING 2025-09-19 13:19:04,586 basehttp 11884 18344 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 13:21:43,281 autoreload 11884 21472 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 13:21:45,927 autoreload 26068 22188 Watching for file changes with StatReloader
+INFO 2025-09-19 13:21:51,903 autoreload 26068 22188 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 13:21:53,484 autoreload 21768 12624 Watching for file changes with StatReloader
+INFO 2025-09-19 13:22:00,613 autoreload 21768 12624 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 13:22:02,525 autoreload 468 14276 Watching for file changes with StatReloader
+INFO 2025-09-19 13:22:19,113 autoreload 468 14276 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\views.py changed, reloading.
+INFO 2025-09-19 13:22:21,046 autoreload 27512 22684 Watching for file changes with StatReloader
+INFO 2025-09-19 13:22:41,069 autoreload 27512 22684 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\views.py changed, reloading.
+INFO 2025-09-19 13:22:42,384 autoreload 23976 26456 Watching for file changes with StatReloader
+INFO 2025-09-19 13:23:47,131 autoreload 23976 26456 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\views.py changed, reloading.
+INFO 2025-09-19 13:23:49,109 autoreload 14276 468 Watching for file changes with StatReloader
+INFO 2025-09-19 13:25:27,795 autoreload 14276 468 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\views.py changed, reloading.
+INFO 2025-09-19 13:25:29,531 autoreload 17020 16572 Watching for file changes with StatReloader
+INFO 2025-09-19 13:25:52,205 autoreload 17020 16572 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\views.py changed, reloading.
+INFO 2025-09-19 13:25:53,929 autoreload 26072 12324 Watching for file changes with StatReloader
+INFO 2025-09-19 13:26:23,003 autoreload 26072 12324 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\views.py changed, reloading.
+INFO 2025-09-19 13:26:24,688 autoreload 14784 15756 Watching for file changes with StatReloader
+INFO 2025-09-19 13:27:00,857 autoreload 14784 15756 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\views.py changed, reloading.
+INFO 2025-09-19 13:27:03,060 autoreload 200 11636 Watching for file changes with StatReloader
+INFO 2025-09-19 13:27:10,808 autoreload 200 11636 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\views.py changed, reloading.
+INFO 2025-09-19 13:27:12,187 autoreload 3336 5244 Watching for file changes with StatReloader
+INFO 2025-09-19 13:27:56,631 views 3336 18036 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 13:27:56,633 views 3336 18036 Starting scenario 'Selected Containers' with 89 items into 1 container types.
+INFO 2025-09-19 13:27:56,684 views 3336 18036 Packed container Closed Body Truck - 20 FT instance 1 with 60 items, weight 8.94 tons, volume 34.54 CBM.
+INFO 2025-09-19 13:27:56,814 views 3336 18036 Packed container Closed Body Truck - 20 FT instance 2 with 14 items, weight 8.94 tons, volume 34.82 CBM.
+INFO 2025-09-19 13:27:56,838 views 3336 18036 Scenario 'Selected Containers' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 13:28:02,060 basehttp 3336 18036 "POST / HTTP/1.1" 200 101322
+INFO 2025-09-19 13:28:02,880 basehttp 3336 18036 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813413
+INFO 2025-09-19 13:28:05,531 basehttp 3336 2856 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781864
+WARNING 2025-09-19 13:28:07,617 log 3336 2856 Not Found: /favicon.ico
+WARNING 2025-09-19 13:28:07,619 basehttp 3336 2856 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 13:33:47,983 autoreload 3336 5244 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 13:33:50,957 autoreload 6432 26964 Watching for file changes with StatReloader
+INFO 2025-09-19 13:34:00,348 autoreload 6432 26964 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 13:34:02,731 autoreload 3244 14044 Watching for file changes with StatReloader
+INFO 2025-09-19 13:34:12,638 autoreload 3244 14044 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 13:34:14,570 autoreload 7360 11428 Watching for file changes with StatReloader
+INFO 2025-09-19 13:34:19,824 autoreload 7360 11428 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 13:34:22,301 autoreload 1372 17928 Watching for file changes with StatReloader
+INFO 2025-09-19 13:35:56,056 autoreload 1372 17928 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 13:35:57,815 autoreload 15424 12248 Watching for file changes with StatReloader
+INFO 2025-09-19 13:36:06,640 autoreload 15424 12248 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\views.py changed, reloading.
+INFO 2025-09-19 13:36:08,755 autoreload 13112 17116 Watching for file changes with StatReloader
+INFO 2025-09-19 13:36:23,150 autoreload 13112 17116 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\views.py changed, reloading.
+INFO 2025-09-19 13:36:25,135 autoreload 1372 22704 Watching for file changes with StatReloader
+INFO 2025-09-19 13:36:32,751 autoreload 1372 22704 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\views.py changed, reloading.
+INFO 2025-09-19 13:36:35,071 autoreload 2584 2216 Watching for file changes with StatReloader
+INFO 2025-09-19 13:36:45,281 autoreload 2584 2216 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\views.py changed, reloading.
+INFO 2025-09-19 13:36:47,319 autoreload 24788 12264 Watching for file changes with StatReloader
+INFO 2025-09-19 13:37:16,539 views 24788 17528 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 13:37:16,540 views 24788 17528 Starting scenario 'Selected Containers' with 89 items into 1 container types.
+INFO 2025-09-19 13:37:16,574 views 24788 17528 Packed container Closed Body Truck - 20 FT instance 1 with 60 items, weight 8.94 tons, volume 34.54 CBM.
+INFO 2025-09-19 13:37:16,613 views 24788 17528 Packed container Closed Body Truck - 20 FT instance 2 with 14 items, weight 8.94 tons, volume 34.82 CBM.
+INFO 2025-09-19 13:37:16,625 views 24788 17528 Scenario 'Selected Containers' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 13:37:19,001 basehttp 24788 17528 "POST / HTTP/1.1" 200 74973
+INFO 2025-09-19 13:37:19,540 basehttp 24788 17528 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813387
+INFO 2025-09-19 13:37:21,269 basehttp 24788 1992 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781864
+WARNING 2025-09-19 13:37:22,487 log 24788 1992 Not Found: /favicon.ico
+WARNING 2025-09-19 13:37:22,488 basehttp 24788 1992 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 13:38:30,142 views 24788 1992 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 13:38:30,143 views 24788 1992 Starting scenario 'Selected Containers' with 89 items into 1 container types.
+INFO 2025-09-19 13:38:30,170 views 24788 1992 Packed container Closed Body Truck - 20 FT instance 1 with 60 items, weight 8.94 tons, volume 34.54 CBM.
+INFO 2025-09-19 13:38:30,208 views 24788 1992 Packed container Closed Body Truck - 20 FT instance 2 with 14 items, weight 8.94 tons, volume 34.82 CBM.
+INFO 2025-09-19 13:38:30,221 views 24788 1992 Scenario 'Selected Containers' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 13:38:32,619 basehttp 24788 1992 "POST / HTTP/1.1" 200 104481
+INFO 2025-09-19 13:38:33,272 basehttp 24788 1992 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813387
+INFO 2025-09-19 13:38:35,010 basehttp 24788 17528 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781864
+WARNING 2025-09-19 13:38:36,507 log 24788 17528 Not Found: /favicon.ico
+WARNING 2025-09-19 13:38:36,508 basehttp 24788 17528 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 13:39:34,406 views 24788 17528 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 13:39:34,407 views 24788 17528 Starting scenario 'Selected Containers' with 89 items into 1 container types.
+INFO 2025-09-19 13:39:34,430 views 24788 17528 Packed container Closed Body Truck - 20 FT instance 1 with 60 items, weight 8.94 tons, volume 34.54 CBM.
+INFO 2025-09-19 13:39:34,466 views 24788 17528 Packed container Closed Body Truck - 20 FT instance 2 with 14 items, weight 8.94 tons, volume 34.82 CBM.
+INFO 2025-09-19 13:39:34,477 views 24788 17528 Scenario 'Selected Containers' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 13:39:36,719 basehttp 24788 17528 "POST / HTTP/1.1" 200 26367
+WARNING 2025-09-19 13:39:37,458 log 24788 17528 Not Found: /favicon.ico
+WARNING 2025-09-19 13:39:37,460 basehttp 24788 17528 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 13:40:43,279 views 24788 17528 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 13:40:43,280 views 24788 17528 Starting scenario 'Selected Containers' with 89 items into 1 container types.
+INFO 2025-09-19 13:40:43,303 views 24788 17528 Packed container Closed Body Truck - 20 FT instance 1 with 60 items, weight 8.94 tons, volume 34.54 CBM.
+INFO 2025-09-19 13:40:43,344 views 24788 17528 Packed container Closed Body Truck - 20 FT instance 2 with 14 items, weight 8.94 tons, volume 34.82 CBM.
+INFO 2025-09-19 13:40:43,358 views 24788 17528 Scenario 'Selected Containers' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 13:40:45,867 basehttp 24788 17528 "POST / HTTP/1.1" 200 40174
+INFO 2025-09-19 13:40:46,539 basehttp 24788 17528 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813387
+INFO 2025-09-19 13:40:48,062 basehttp 24788 1992 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781864
+WARNING 2025-09-19 13:40:49,446 log 24788 1992 Not Found: /favicon.ico
+WARNING 2025-09-19 13:40:49,447 basehttp 24788 1992 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 13:41:37,313 autoreload 24788 12264 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 13:41:38,702 autoreload 20304 8748 Watching for file changes with StatReloader
+INFO 2025-09-19 13:41:58,543 views 20304 17996 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 13:41:58,544 views 20304 17996 Starting scenario 'Selected Containers' with 89 items into 1 container types.
+INFO 2025-09-19 13:41:58,577 views 20304 17996 Packed container Closed Body Truck - 20 FT instance 1 with 60 items, weight 8.94 tons, volume 34.54 CBM.
+INFO 2025-09-19 13:41:58,623 views 20304 17996 Packed container Closed Body Truck - 20 FT instance 2 with 14 items, weight 8.94 tons, volume 34.82 CBM.
+INFO 2025-09-19 13:41:58,633 views 20304 17996 Scenario 'Selected Containers' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 13:42:01,191 basehttp 20304 17996 "POST / HTTP/1.1" 200 40187
+INFO 2025-09-19 13:42:01,728 basehttp 20304 17996 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813387
+INFO 2025-09-19 13:42:03,109 basehttp 20304 10388 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781864
+WARNING 2025-09-19 13:42:03,825 log 20304 10388 Not Found: /favicon.ico
+WARNING 2025-09-19 13:42:03,831 basehttp 20304 10388 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 13:43:00,385 autoreload 20304 8748 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 13:43:02,053 autoreload 20672 14420 Watching for file changes with StatReloader
+INFO 2025-09-19 13:43:07,483 autoreload 20672 14420 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 13:43:08,808 autoreload 19792 23852 Watching for file changes with StatReloader
+INFO 2025-09-19 13:43:11,661 autoreload 19792 23852 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\views.py changed, reloading.
+INFO 2025-09-19 13:43:13,265 autoreload 27372 22828 Watching for file changes with StatReloader
+INFO 2025-09-19 13:43:17,561 autoreload 27372 22828 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 13:43:18,820 autoreload 19156 7688 Watching for file changes with StatReloader
+INFO 2025-09-19 13:43:21,936 autoreload 19156 7688 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 13:43:23,165 autoreload 23832 18072 Watching for file changes with StatReloader
+INFO 2025-09-19 13:43:26,354 autoreload 23832 18072 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 13:43:27,566 autoreload 20812 19172 Watching for file changes with StatReloader
+INFO 2025-09-19 13:43:31,551 autoreload 20812 19172 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 13:43:32,929 autoreload 4368 26812 Watching for file changes with StatReloader
+INFO 2025-09-19 13:43:36,912 autoreload 4368 26812 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\views.py changed, reloading.
+INFO 2025-09-19 13:43:38,151 autoreload 24040 13660 Watching for file changes with StatReloader
+INFO 2025-09-19 13:43:53,612 views 24040 6824 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 13:43:53,613 views 24040 6824 Starting scenario 'Selected Containers' with 89 items into 1 container types.
+INFO 2025-09-19 13:43:53,649 views 24040 6824 Packed container Closed Body Truck - 20 FT instance 1 with 60 items, weight 8.94 tons, volume 34.54 CBM.
+INFO 2025-09-19 13:43:53,692 views 24040 6824 Packed container Closed Body Truck - 20 FT instance 2 with 14 items, weight 8.94 tons, volume 34.82 CBM.
+INFO 2025-09-19 13:43:53,705 views 24040 6824 Scenario 'Selected Containers' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 13:43:55,956 basehttp 24040 6824 "POST / HTTP/1.1" 200 36951
+INFO 2025-09-19 13:43:56,393 basehttp 24040 6824 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813374
+INFO 2025-09-19 13:43:57,197 basehttp 24040 19228 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781864
+WARNING 2025-09-19 13:43:57,875 log 24040 19228 Not Found: /favicon.ico
+WARNING 2025-09-19 13:43:57,876 basehttp 24040 19228 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 13:44:13,992 views 24040 19228 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 13:44:13,992 views 24040 19228 Starting scenario 'Selected Containers' with 89 items into 1 container types.
+INFO 2025-09-19 13:44:14,009 views 24040 19228 Packed container Closed Body Truck - 20 FT instance 1 with 60 items, weight 8.94 tons, volume 34.54 CBM.
+INFO 2025-09-19 13:44:14,046 views 24040 19228 Packed container Closed Body Truck - 20 FT instance 2 with 14 items, weight 8.94 tons, volume 34.82 CBM.
+INFO 2025-09-19 13:44:14,058 views 24040 19228 Scenario 'Selected Containers' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 13:44:16,137 basehttp 24040 19228 "POST / HTTP/1.1" 200 101231
+INFO 2025-09-19 13:44:16,577 basehttp 24040 19228 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813374
+INFO 2025-09-19 13:44:17,495 basehttp 24040 6824 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781864
+WARNING 2025-09-19 13:44:18,285 log 24040 6824 Not Found: /favicon.ico
+WARNING 2025-09-19 13:44:18,286 basehttp 24040 6824 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 13:45:44,951 views 24040 6824 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 13:45:44,952 views 24040 6824 Starting scenario 'Selected Containers' with 89 items into 1 container types.
+INFO 2025-09-19 13:45:44,972 views 24040 6824 Packed container Closed Body Truck - 20 FT instance 1 with 60 items, weight 8.94 tons, volume 34.54 CBM.
+INFO 2025-09-19 13:45:45,006 views 24040 6824 Packed container Closed Body Truck - 20 FT instance 2 with 14 items, weight 8.94 tons, volume 34.82 CBM.
+INFO 2025-09-19 13:45:45,016 views 24040 6824 Scenario 'Selected Containers' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 13:45:47,060 basehttp 24040 6824 "POST / HTTP/1.1" 200 101231
+INFO 2025-09-19 13:45:47,544 basehttp 24040 6824 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813374
+INFO 2025-09-19 13:45:48,780 basehttp 24040 19228 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781864
+WARNING 2025-09-19 13:45:50,502 log 24040 19228 Not Found: /favicon.ico
+WARNING 2025-09-19 13:45:50,503 basehttp 24040 19228 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 13:46:09,443 views 24040 19228 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 13:46:09,445 views 24040 19228 Starting scenario 'Selected Containers' with 89 items into 1 container types.
+INFO 2025-09-19 13:46:09,463 views 24040 19228 Packed container Closed Body Truck - 20 FT instance 1 with 60 items, weight 8.94 tons, volume 34.54 CBM.
+INFO 2025-09-19 13:46:09,497 views 24040 19228 Packed container Closed Body Truck - 20 FT instance 2 with 14 items, weight 8.94 tons, volume 34.82 CBM.
+INFO 2025-09-19 13:46:09,508 views 24040 19228 Scenario 'Selected Containers' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 13:46:11,942 basehttp 24040 19228 "POST / HTTP/1.1" 200 101231
+INFO 2025-09-19 13:46:12,444 basehttp 24040 19228 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813374
+INFO 2025-09-19 13:46:13,672 basehttp 24040 6824 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781864
+WARNING 2025-09-19 13:46:14,873 log 24040 6824 Not Found: /favicon.ico
+WARNING 2025-09-19 13:46:14,874 basehttp 24040 6824 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 13:46:30,266 autoreload 12040 5296 Watching for file changes with StatReloader
+INFO 2025-09-19 13:46:33,750 views 12040 12624 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 13:46:33,751 views 12040 12624 Starting scenario 'Selected Containers' with 89 items into 1 container types.
+INFO 2025-09-19 13:46:33,776 views 12040 12624 Packed container Closed Body Truck - 20 FT instance 1 with 60 items, weight 8.94 tons, volume 34.54 CBM.
+INFO 2025-09-19 13:46:33,816 views 12040 12624 Packed container Closed Body Truck - 20 FT instance 2 with 14 items, weight 8.94 tons, volume 34.82 CBM.
+INFO 2025-09-19 13:46:33,828 views 12040 12624 Scenario 'Selected Containers' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 13:46:36,183 basehttp 12040 12624 "POST / HTTP/1.1" 200 101231
+INFO 2025-09-19 13:46:36,687 basehttp 12040 12624 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813374
+INFO 2025-09-19 13:46:38,175 basehttp 12040 10776 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781864
+WARNING 2025-09-19 13:46:39,438 log 12040 10776 Not Found: /favicon.ico
+WARNING 2025-09-19 13:46:39,439 basehttp 12040 10776 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 13:51:37,081 autoreload 12040 5296 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\views.py changed, reloading.
+INFO 2025-09-19 13:51:38,352 autoreload 18676 18400 Watching for file changes with StatReloader
+INFO 2025-09-19 13:53:36,580 autoreload 18676 18400 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\views.py changed, reloading.
+INFO 2025-09-19 13:53:37,821 autoreload 9156 6908 Watching for file changes with StatReloader
+INFO 2025-09-19 13:54:47,789 autoreload 9156 6908 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\views.py changed, reloading.
+INFO 2025-09-19 13:54:48,914 autoreload 10620 13268 Watching for file changes with StatReloader
+INFO 2025-09-19 13:55:09,835 views 10620 1236 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 13:55:09,836 views 10620 1236 Starting scenario 'Selected Containers' with 89 items into 1 container types.
+INFO 2025-09-19 13:55:09,925 views 10620 1236 Scenario 'Selected Containers' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 13:55:11,644 views 10620 1236 Packed container Closed Body Truck - 20 FT instance 1 with 53 items, weight 8.94 tons, volume 17.74 CBM.
+INFO 2025-09-19 13:55:12,240 views 10620 1236 Packed container Closed Body Truck - 20 FT instance 2 with 7 items, weight 4.27 tons, volume 21.24 CBM.
+INFO 2025-09-19 13:55:12,282 basehttp 10620 1236 "POST / HTTP/1.1" 200 101283
+INFO 2025-09-19 13:55:12,952 basehttp 10620 1236 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813387
+INFO 2025-09-19 13:55:14,452 basehttp 10620 11976 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781864
+WARNING 2025-09-19 13:55:15,848 log 10620 11976 Not Found: /favicon.ico
+WARNING 2025-09-19 13:55:15,850 basehttp 10620 11976 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 14:04:31,417 views 10620 27060 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 14:04:31,419 views 10620 27060 Starting scenario 'Selected Containers' with 89 items into 1 container types.
+INFO 2025-09-19 14:04:31,509 views 10620 27060 Scenario 'Selected Containers' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 14:04:32,959 views 10620 27060 Packed container Closed Body Truck - 20 FT instance 1 with 53 items, weight 8.94 tons, volume 17.74 CBM.
+INFO 2025-09-19 14:04:33,624 views 10620 27060 Packed container Closed Body Truck - 20 FT instance 2 with 7 items, weight 4.27 tons, volume 21.24 CBM.
+INFO 2025-09-19 14:04:33,645 basehttp 10620 27060 "POST / HTTP/1.1" 200 101324
+WARNING 2025-09-19 14:04:34,311 basehttp 10620 27060 "GET /static/ HTTP/1.1" 404 1767
+WARNING 2025-09-19 14:04:34,311 basehttp 10620 26408 "GET /static/ HTTP/1.1" 404 1767
+WARNING 2025-09-19 14:04:34,907 log 10620 12176 Not Found: /favicon.ico
+WARNING 2025-09-19 14:04:34,908 basehttp 10620 12176 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 14:07:31,777 views 10620 12176 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 14:07:31,778 views 10620 12176 Starting scenario 'Selected Containers' with 89 items into 1 container types.
+INFO 2025-09-19 14:07:31,850 views 10620 12176 Scenario 'Selected Containers' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 14:07:33,339 views 10620 12176 Packed container Closed Body Truck - 20 FT instance 1 with 53 items, weight 8.94 tons, volume 17.74 CBM.
+INFO 2025-09-19 14:07:34,095 views 10620 12176 Packed container Closed Body Truck - 20 FT instance 2 with 7 items, weight 4.27 tons, volume 21.24 CBM.
+INFO 2025-09-19 14:07:34,161 basehttp 10620 12176 "POST / HTTP/1.1" 200 101283
+INFO 2025-09-19 14:07:35,427 basehttp 10620 21976 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781864
+INFO 2025-09-19 14:07:35,453 basehttp 10620 12176 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813387
+WARNING 2025-09-19 14:07:38,612 log 10620 21976 Not Found: /favicon.ico
+WARNING 2025-09-19 14:07:38,613 basehttp 10620 21976 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 14:10:09,823 views 10620 21976 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 14:10:09,824 views 10620 21976 Starting scenario 'Selected Containers' with 89 items into 1 container types.
+INFO 2025-09-19 14:10:09,882 views 10620 21976 Scenario 'Selected Containers' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 14:10:11,599 views 10620 21976 Packed container Closed Body Truck - 20 FT instance 1 with 53 items, weight 8.94 tons, volume 17.74 CBM.
+INFO 2025-09-19 14:10:12,252 views 10620 21976 Packed container Closed Body Truck - 20 FT instance 2 with 7 items, weight 4.27 tons, volume 21.24 CBM.
+INFO 2025-09-19 14:10:12,274 basehttp 10620 21976 "POST / HTTP/1.1" 200 101478
+INFO 2025-09-19 14:10:12,804 basehttp 10620 21976 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813387
+INFO 2025-09-19 14:10:14,247 basehttp 10620 12176 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781864
+WARNING 2025-09-19 14:10:15,823 log 10620 12176 Not Found: /favicon.ico
+WARNING 2025-09-19 14:10:15,823 basehttp 10620 12176 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 14:10:34,192 basehttp 10620 12176 "GET / HTTP/1.1" 200 100153
+INFO 2025-09-19 14:10:42,641 basehttp 10620 12176 "GET /get_container_sizes/8/ HTTP/1.1" 200 240
+INFO 2025-09-19 14:10:46,175 views 10620 12176 Expanded data to 265 individual items from 40 selected records.
+INFO 2025-09-19 14:10:46,175 views 10620 12176 Starting scenario 'Closed Body Truck - 20 FT' with 265 items into Closed Body Truck - 20 FT.
+INFO 2025-09-19 14:10:46,400 views 10620 12176 Scenario 'Closed Body Truck - 20 FT' complete. Used 2 containers. Remaining items: 191.
+INFO 2025-09-19 14:10:49,144 views 10620 12176 Packed container Closed Body Truck - 20 FT instance 1 with 53 items, weight 8.94 tons, volume 17.74 CBM.
+INFO 2025-09-19 14:10:50,210 views 10620 12176 Packed container Closed Body Truck - 20 FT instance 2 with 7 items, weight 4.27 tons, volume 21.24 CBM.
+INFO 2025-09-19 14:10:50,217 views 10620 12176 Starting scenario 'Closed Body Truck - 24 FT' with 265 items into Closed Body Truck - 24 FT.
+INFO 2025-09-19 14:10:50,340 views 10620 12176 Scenario 'Closed Body Truck - 24 FT' complete. Used 2 containers. Remaining items: 188.
+INFO 2025-09-19 14:10:54,368 views 10620 12176 Packed container Closed Body Truck - 24 FT instance 1 with 56 items, weight 9.94 tons, volume 25.14 CBM.
+INFO 2025-09-19 14:10:55,670 views 10620 12176 Packed container Closed Body Truck - 24 FT instance 2 with 5 items, weight 2.88 tons, volume 20.51 CBM.
+INFO 2025-09-19 14:10:55,676 views 10620 12176 Starting scenario 'Closed Body Truck - 28 FT' with 265 items into Closed Body Truck - 28 FT.
+INFO 2025-09-19 14:10:55,883 views 10620 12176 Scenario 'Closed Body Truck - 28 FT' complete. Used 2 containers. Remaining items: 180.
+INFO 2025-09-19 14:10:58,858 views 10620 12176 Packed container Closed Body Truck - 28 FT instance 1 with 60 items, weight 13.28 tons, volume 31.38 CBM.
+INFO 2025-09-19 14:10:59,918 views 10620 12176 Packed container Closed Body Truck - 28 FT instance 2 with 7 items, weight 5.18 tons, volume 25.54 CBM.
+INFO 2025-09-19 14:10:59,922 views 10620 12176 Starting scenario 'Closed Body Truck - 28–32 FT' with 265 items into Closed Body Truck - 28–32 FT.
+INFO 2025-09-19 14:10:59,991 views 10620 12176 Scenario 'Closed Body Truck - 28–32 FT' complete. Used 1 containers. Remaining items: 195.
+INFO 2025-09-19 14:11:03,160 views 10620 12176 Packed container Closed Body Truck - 28–32 FT instance 1 with 59 items, weight 12.97 tons, volume 36.59 CBM.
+INFO 2025-09-19 14:11:03,165 views 10620 12176 Starting scenario 'Closed Body Truck - 32 FT' with 265 items into Closed Body Truck - 32 FT.
+INFO 2025-09-19 14:11:03,239 views 10620 12176 Scenario 'Closed Body Truck - 32 FT' complete. Used 1 containers. Remaining items: 194.
+INFO 2025-09-19 14:11:06,368 views 10620 12176 Packed container Closed Body Truck - 32 FT instance 1 with 50 items, weight 15.14 tons, volume 41.42 CBM.
+INFO 2025-09-19 14:11:06,372 views 10620 12176 Starting scenario 'Closed Body Truck HD - 32 FT Medium' with 265 items into Closed Body Truck HD - 32 FT Medium.
+INFO 2025-09-19 14:11:06,434 views 10620 12176 Scenario 'Closed Body Truck HD - 32 FT Medium' complete. Used 1 containers. Remaining items: 192.
+INFO 2025-09-19 14:11:10,396 views 10620 12176 Packed container Closed Body Truck HD - 32 FT Medium instance 1 with 64 items, weight 17.29 tons, volume 40.80 CBM.
+INFO 2025-09-19 14:11:10,400 views 10620 12176 Starting scenario 'Closed Body Truck XL - 32 FT High' with 265 items into Closed Body Truck XL - 32 FT High.
+INFO 2025-09-19 14:11:10,484 views 10620 12176 Scenario 'Closed Body Truck XL - 32 FT High' complete. Used 1 containers. Remaining items: 187.
+INFO 2025-09-19 14:11:14,294 views 10620 12176 Packed container Closed Body Truck XL - 32 FT High instance 1 with 55 items, weight 23.07 tons, volume 43.58 CBM.
+INFO 2025-09-19 14:11:14,603 basehttp 10620 12176 "POST / HTTP/1.1" 200 1660630
+INFO 2025-09-19 14:11:15,357 basehttp 10620 12176 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813387
+INFO 2025-09-19 14:11:15,371 basehttp 10620 21976 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781864
+INFO 2025-09-19 14:11:15,516 basehttp 10620 5492 "GET /static/optimization/3d_model_1_1.html HTTP/1.1" 200 4780899
+INFO 2025-09-19 14:11:15,529 basehttp 10620 7872 "GET /static/optimization/3d_model_1_0.html HTTP/1.1" 200 4813490
+INFO 2025-09-19 14:11:19,008 basehttp 10620 12176 "GET /static/optimization/3d_model_2_1.html HTTP/1.1" 200 4782216
+INFO 2025-09-19 14:11:22,046 basehttp 10620 21976 "GET /static/optimization/3d_model_2_0.html HTTP/1.1" 200 4817814
+INFO 2025-09-19 14:11:26,748 basehttp 10620 7872 "GET /static/optimization/3d_model_3_0.html HTTP/1.1" 200 4814285
+INFO 2025-09-19 14:11:30,744 basehttp 10620 5492 "GET /static/optimization/3d_model_4_0.html HTTP/1.1" 200 4809475
+INFO 2025-09-19 14:11:30,757 basehttp 10620 19592 "GET /static/optimization/3d_model_6_0.html HTTP/1.1" 200 4813249
+INFO 2025-09-19 14:11:30,939 basehttp 10620 18752 "GET /static/optimization/3d_model_5_0.html HTTP/1.1" 200 4817371
+INFO 2025-09-19 14:11:57,790 basehttp 10620 19592 "GET / HTTP/1.1" 200 100153
+INFO 2025-09-19 14:12:03,575 basehttp 10620 19592 "GET /get_container_sizes/8/ HTTP/1.1" 200 240
+INFO 2025-09-19 14:12:06,296 views 10620 19592 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 14:12:06,297 views 10620 19592 Starting scenario 'Closed Body Truck - 20 FT' with 89 items into Closed Body Truck - 20 FT.
+INFO 2025-09-19 14:12:06,367 views 10620 19592 Scenario 'Closed Body Truck - 20 FT' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 14:12:09,290 views 10620 19592 Packed container Closed Body Truck - 20 FT instance 1 with 53 items, weight 8.94 tons, volume 17.74 CBM.
+INFO 2025-09-19 14:12:10,489 views 10620 19592 Packed container Closed Body Truck - 20 FT instance 2 with 7 items, weight 4.27 tons, volume 21.24 CBM.
+INFO 2025-09-19 14:12:10,493 views 10620 19592 Starting scenario 'Closed Body Truck - 24 FT' with 89 items into Closed Body Truck - 24 FT.
+INFO 2025-09-19 14:12:10,553 views 10620 19592 Scenario 'Closed Body Truck - 24 FT' complete. Used 2 containers. Remaining items: 12.
+INFO 2025-09-19 14:12:14,313 views 10620 19592 Packed container Closed Body Truck - 24 FT instance 1 with 56 items, weight 9.94 tons, volume 25.14 CBM.
+INFO 2025-09-19 14:12:15,633 views 10620 19592 Packed container Closed Body Truck - 24 FT instance 2 with 6 items, weight 3.72 tons, volume 21.97 CBM.
+INFO 2025-09-19 14:12:15,639 views 10620 19592 Starting scenario 'Closed Body Truck - 28 FT' with 89 items into Closed Body Truck - 28 FT.
+INFO 2025-09-19 14:12:15,706 views 10620 19592 Scenario 'Closed Body Truck - 28 FT' complete. Used 2 containers. Remaining items: 4.
+INFO 2025-09-19 14:12:20,679 views 10620 19592 Packed container Closed Body Truck - 28 FT instance 1 with 60 items, weight 12.85 tons, volume 32.00 CBM.
+INFO 2025-09-19 14:12:23,029 views 10620 19592 Packed container Closed Body Truck - 28 FT instance 2 with 7 items, weight 4.45 tons, volume 28.51 CBM.
+INFO 2025-09-19 14:12:23,032 views 10620 19592 Starting scenario 'Closed Body Truck - 28–32 FT' with 89 items into Closed Body Truck - 28–32 FT.
+INFO 2025-09-19 14:12:23,065 views 10620 19592 Scenario 'Closed Body Truck - 28–32 FT' complete. Used 1 containers. Remaining items: 19.
+INFO 2025-09-19 14:12:28,867 views 10620 19592 Packed container Closed Body Truck - 28–32 FT instance 1 with 59 items, weight 12.97 tons, volume 36.59 CBM.
+INFO 2025-09-19 14:12:28,874 views 10620 19592 Starting scenario 'Closed Body Truck - 32 FT' with 89 items into Closed Body Truck - 32 FT.
+INFO 2025-09-19 14:12:28,913 views 10620 19592 Scenario 'Closed Body Truck - 32 FT' complete. Used 1 containers. Remaining items: 18.
+INFO 2025-09-19 14:12:35,171 views 10620 19592 Packed container Closed Body Truck - 32 FT instance 1 with 50 items, weight 15.14 tons, volume 41.42 CBM.
+INFO 2025-09-19 14:12:35,175 views 10620 19592 Starting scenario 'Closed Body Truck HD - 32 FT Medium' with 89 items into Closed Body Truck HD - 32 FT Medium.
+INFO 2025-09-19 14:12:35,211 views 10620 19592 Scenario 'Closed Body Truck HD - 32 FT Medium' complete. Used 1 containers. Remaining items: 16.
+INFO 2025-09-19 14:12:41,656 views 10620 19592 Packed container Closed Body Truck HD - 32 FT Medium instance 1 with 64 items, weight 17.29 tons, volume 40.80 CBM.
+INFO 2025-09-19 14:12:41,664 views 10620 19592 Starting scenario 'Closed Body Truck XL - 32 FT High' with 89 items into Closed Body Truck XL - 32 FT High.
+INFO 2025-09-19 14:12:41,762 views 10620 19592 Scenario 'Closed Body Truck XL - 32 FT High' complete. Used 1 containers. Remaining items: 11.
+INFO 2025-09-19 14:12:48,858 views 10620 19592 Packed container Closed Body Truck XL - 32 FT High instance 1 with 55 items, weight 23.07 tons, volume 43.58 CBM.
+INFO 2025-09-19 14:12:49,021 basehttp 10620 19592 "POST / HTTP/1.1" 200 616019
+INFO 2025-09-19 14:12:49,509 basehttp 10620 19592 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813387
+INFO 2025-09-19 14:12:49,516 basehttp 10620 5492 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781864
+INFO 2025-09-19 14:12:49,722 basehttp 10620 21976 "GET /static/optimization/3d_model_2_1.html HTTP/1.1" 200 4782470
+INFO 2025-09-19 14:12:49,740 basehttp 10620 7872 "GET /static/optimization/3d_model_1_1.html HTTP/1.1" 200 4781462
+INFO 2025-09-19 14:12:49,757 basehttp 10620 18752 "GET /static/optimization/3d_model_1_0.html HTTP/1.1" 200 4813490
+INFO 2025-09-19 14:12:49,774 basehttp 10620 12176 "GET /static/optimization/3d_model_2_0.html HTTP/1.1" 200 4816805
+INFO 2025-09-19 14:12:49,810 basehttp 10620 19592 "GET /static/optimization/3d_model_3_0.html HTTP/1.1" 200 4814285
+INFO 2025-09-19 14:12:51,018 basehttp 10620 7872 "GET /static/optimization/3d_model_5_0.html HTTP/1.1" 200 4817371
+INFO 2025-09-19 14:12:54,147 basehttp 10620 18752 "GET /static/optimization/3d_model_6_0.html HTTP/1.1" 200 4813249
+INFO 2025-09-19 14:12:55,945 basehttp 10620 5492 "GET /static/optimization/3d_model_4_0.html HTTP/1.1" 200 4809475
+INFO 2025-09-19 14:15:40,180 autoreload 10620 13268 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 14:15:42,999 autoreload 24632 5772 Watching for file changes with StatReloader
+INFO 2025-09-19 14:16:04,540 views 24632 16708 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 14:16:04,542 views 24632 16708 Starting scenario 'Closed Body Truck - 20 FT' with 89 items into Closed Body Truck - 20 FT.
+INFO 2025-09-19 14:16:04,748 views 24632 16708 Scenario 'Closed Body Truck - 20 FT' complete. Used 3 containers. Remaining items: 4.
+INFO 2025-09-19 14:16:09,289 views 24632 16708 Packed container Closed Body Truck - 20 FT instance 1 with 53 items, weight 8.94 tons, volume 17.74 CBM.
+INFO 2025-09-19 14:16:09,909 views 24632 16708 Packed container Closed Body Truck - 20 FT instance 2 with 7 items, weight 4.27 tons, volume 21.24 CBM.
+INFO 2025-09-19 14:16:10,419 views 24632 16708 Packed container Closed Body Truck - 20 FT instance 3 with 9 items, weight 7.21 tons, volume 20.81 CBM.
+INFO 2025-09-19 14:16:10,421 views 24632 16708 Starting scenario 'Closed Body Truck - 24 FT' with 89 items into Closed Body Truck - 24 FT.
+INFO 2025-09-19 14:16:10,461 views 24632 16708 Scenario 'Closed Body Truck - 24 FT' complete. Used 2 containers. Remaining items: 12.
+INFO 2025-09-19 14:16:12,572 views 24632 16708 Packed container Closed Body Truck - 24 FT instance 1 with 56 items, weight 9.94 tons, volume 25.14 CBM.
+INFO 2025-09-19 14:16:13,344 views 24632 16708 Packed container Closed Body Truck - 24 FT instance 2 with 6 items, weight 3.72 tons, volume 21.97 CBM.
+INFO 2025-09-19 14:16:13,346 views 24632 16708 Starting scenario 'Closed Body Truck - 28 FT' with 89 items into Closed Body Truck - 28 FT.
+INFO 2025-09-19 14:16:13,395 views 24632 16708 Scenario 'Closed Body Truck - 28 FT' complete. Used 2 containers. Remaining items: 4.
+INFO 2025-09-19 14:16:16,127 views 24632 16708 Packed container Closed Body Truck - 28 FT instance 1 with 60 items, weight 12.85 tons, volume 32.00 CBM.
+INFO 2025-09-19 14:16:17,524 views 24632 16708 Packed container Closed Body Truck - 28 FT instance 2 with 7 items, weight 4.45 tons, volume 28.51 CBM.
+INFO 2025-09-19 14:16:17,527 views 24632 16708 Starting scenario 'Closed Body Truck - 28–32 FT' with 89 items into Closed Body Truck - 28–32 FT.
+INFO 2025-09-19 14:16:17,579 views 24632 16708 Scenario 'Closed Body Truck - 28–32 FT' complete. Used 2 containers. Remaining items: 2.
+INFO 2025-09-19 14:16:20,846 views 24632 16708 Packed container Closed Body Truck - 28–32 FT instance 1 with 59 items, weight 12.97 tons, volume 36.59 CBM.
+INFO 2025-09-19 14:16:22,065 views 24632 16708 Packed container Closed Body Truck - 28–32 FT instance 2 with 11 items, weight 9.04 tons, volume 29.82 CBM.
+INFO 2025-09-19 14:16:22,071 views 24632 16708 Starting scenario 'Closed Body Truck - 32 FT' with 89 items into Closed Body Truck - 32 FT.
+INFO 2025-09-19 14:16:22,106 views 24632 16708 Scenario 'Closed Body Truck - 32 FT' complete. Used 2 containers. Remaining items: 1.
+INFO 2025-09-19 14:16:25,525 views 24632 16708 Packed container Closed Body Truck - 32 FT instance 1 with 50 items, weight 15.14 tons, volume 41.42 CBM.
+INFO 2025-09-19 14:16:26,690 views 24632 16708 Packed container Closed Body Truck - 32 FT instance 2 with 16 items, weight 14.33 tons, volume 35.39 CBM.
+INFO 2025-09-19 14:16:26,692 views 24632 16708 Starting scenario 'Closed Body Truck HD - 32 FT Medium' with 89 items into Closed Body Truck HD - 32 FT Medium.
+INFO 2025-09-19 14:16:26,722 views 24632 16708 Scenario 'Closed Body Truck HD - 32 FT Medium' complete. Used 2 containers. Remaining items: 0.
+INFO 2025-09-19 14:16:30,150 views 24632 16708 Packed container Closed Body Truck HD - 32 FT Medium instance 1 with 64 items, weight 17.29 tons, volume 40.80 CBM.
+INFO 2025-09-19 14:16:31,347 views 24632 16708 Packed container Closed Body Truck HD - 32 FT Medium instance 2 with 13 items, weight 12.95 tons, volume 34.51 CBM.
+INFO 2025-09-19 14:16:31,350 views 24632 16708 Starting scenario 'Closed Body Truck XL - 32 FT High' with 89 items into Closed Body Truck XL - 32 FT High.
+INFO 2025-09-19 14:16:31,402 views 24632 16708 Scenario 'Closed Body Truck XL - 32 FT High' complete. Used 1 containers. Remaining items: 11.
+INFO 2025-09-19 14:16:34,858 views 24632 16708 Packed container Closed Body Truck XL - 32 FT High instance 1 with 55 items, weight 23.07 tons, volume 43.58 CBM.
+INFO 2025-09-19 14:16:34,988 basehttp 24632 16708 "POST / HTTP/1.1" 200 627940
+INFO 2025-09-19 14:16:36,712 basehttp 24632 16708 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813374
+INFO 2025-09-19 14:16:36,730 basehttp 24632 4052 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781877
+INFO 2025-09-19 14:16:36,738 basehttp 24632 21976 "GET /static/optimization/3d_model_0_2.html HTTP/1.1" 200 4783391
+INFO 2025-09-19 14:16:36,796 basehttp 24632 7872 "GET /static/optimization/3d_model_1_0.html HTTP/1.1" 200 4813477
+INFO 2025-09-19 14:16:36,822 basehttp 24632 11288 "GET /static/optimization/3d_model_1_1.html HTTP/1.1" 200 4781475
+INFO 2025-09-19 14:16:37,218 basehttp 24632 16708 "GET /static/optimization/3d_model_2_1.html HTTP/1.1" 200 4782444
+INFO 2025-09-19 14:16:37,292 basehttp 24632 2336 "GET /static/optimization/3d_model_2_0.html HTTP/1.1" 200 4816805
+INFO 2025-09-19 14:16:37,321 basehttp 24632 4052 "GET /static/optimization/3d_model_3_1.html HTTP/1.1" 200 4784629
+INFO 2025-09-19 14:16:37,326 basehttp 24632 21976 "GET /static/optimization/3d_model_3_0.html HTTP/1.1" 200 4814272
+INFO 2025-09-19 14:16:42,073 basehttp 24632 11288 "GET /static/optimization/3d_model_4_0.html HTTP/1.1" 200 4809475
+INFO 2025-09-19 14:16:42,092 basehttp 24632 7872 "GET /static/optimization/3d_model_4_1.html HTTP/1.1" 200 4787900
+INFO 2025-09-19 14:16:51,925 basehttp 24632 16708 "GET /static/optimization/3d_model_5_1.html HTTP/1.1" 200 4786029
+INFO 2025-09-19 14:16:52,873 basehttp 24632 2336 "GET /static/optimization/3d_model_5_0.html HTTP/1.1" 200 4817371
+INFO 2025-09-19 14:16:52,894 basehttp 24632 4052 "GET /static/optimization/3d_model_6_0.html HTTP/1.1" 200 4813249
+WARNING 2025-09-19 14:17:05,044 log 24632 4052 Not Found: /favicon.ico
+WARNING 2025-09-19 14:17:05,044 basehttp 24632 4052 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 14:19:05,360 views 24632 7084 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 14:19:05,362 views 24632 7084 Starting scenario 'Closed Body Truck - 20 FT' with 89 items into Closed Body Truck - 20 FT.
+INFO 2025-09-19 14:19:05,467 views 24632 7084 Scenario 'Closed Body Truck - 20 FT' complete. Used 3 containers. Remaining items: 4.
+INFO 2025-09-19 14:19:07,304 views 24632 7084 Packed container Closed Body Truck - 20 FT instance 1 with 53 items, weight 8.94 tons, volume 17.74 CBM.
+INFO 2025-09-19 14:19:08,021 views 24632 7084 Packed container Closed Body Truck - 20 FT instance 2 with 7 items, weight 4.27 tons, volume 21.24 CBM.
+INFO 2025-09-19 14:19:08,692 autoreload 24632 5772 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 14:19:10,428 autoreload 13968 19156 Watching for file changes with StatReloader
+INFO 2025-09-19 14:19:14,882 views 13968 2840 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 14:19:14,884 views 13968 2840 Starting scenario 'Closed Body Truck - 20 FT' with 89 items into Closed Body Truck - 20 FT.
+INFO 2025-09-19 14:19:14,960 views 13968 2840 Scenario 'Closed Body Truck - 20 FT' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 14:19:16,735 views 13968 2840 Packed container Closed Body Truck - 20 FT instance 1 with 53 items, weight 8.94 tons, volume 17.74 CBM.
+INFO 2025-09-19 14:19:17,381 views 13968 2840 Packed container Closed Body Truck - 20 FT instance 2 with 7 items, weight 4.27 tons, volume 21.24 CBM.
+INFO 2025-09-19 14:19:17,390 views 13968 2840 Starting scenario 'Closed Body Truck - 24 FT' with 89 items into Closed Body Truck - 24 FT.
+INFO 2025-09-19 14:19:17,427 views 13968 2840 Scenario 'Closed Body Truck - 24 FT' complete. Used 2 containers. Remaining items: 12.
+INFO 2025-09-19 14:19:19,555 views 13968 2840 Packed container Closed Body Truck - 24 FT instance 1 with 56 items, weight 9.94 tons, volume 25.14 CBM.
+INFO 2025-09-19 14:19:20,372 views 13968 2840 Packed container Closed Body Truck - 24 FT instance 2 with 6 items, weight 3.72 tons, volume 21.97 CBM.
+INFO 2025-09-19 14:19:20,376 views 13968 2840 Starting scenario 'Closed Body Truck - 28 FT' with 89 items into Closed Body Truck - 28 FT.
+INFO 2025-09-19 14:19:20,423 views 13968 2840 Scenario 'Closed Body Truck - 28 FT' complete. Used 2 containers. Remaining items: 4.
+INFO 2025-09-19 14:19:23,034 views 13968 2840 Packed container Closed Body Truck - 28 FT instance 1 with 60 items, weight 12.85 tons, volume 32.00 CBM.
+INFO 2025-09-19 14:19:24,226 views 13968 2840 Packed container Closed Body Truck - 28 FT instance 2 with 7 items, weight 4.45 tons, volume 28.51 CBM.
+INFO 2025-09-19 14:19:24,232 views 13968 2840 Starting scenario 'Closed Body Truck - 28–32 FT' with 89 items into Closed Body Truck - 28–32 FT.
+INFO 2025-09-19 14:19:24,270 views 13968 2840 Scenario 'Closed Body Truck - 28–32 FT' complete. Used 2 containers. Remaining items: 2.
+INFO 2025-09-19 14:19:27,173 views 13968 2840 Packed container Closed Body Truck - 28–32 FT instance 1 with 59 items, weight 12.97 tons, volume 36.59 CBM.
+INFO 2025-09-19 14:19:28,322 views 13968 2840 Packed container Closed Body Truck - 28–32 FT instance 2 with 11 items, weight 9.22 tons, volume 31.00 CBM.
+INFO 2025-09-19 14:19:28,325 views 13968 2840 Starting scenario 'Closed Body Truck - 32 FT' with 89 items into Closed Body Truck - 32 FT.
+INFO 2025-09-19 14:19:28,345 views 13968 2840 Scenario 'Closed Body Truck - 32 FT' complete. Used 1 containers. Remaining items: 18.
+INFO 2025-09-19 14:19:32,062 views 13968 2840 Packed container Closed Body Truck - 32 FT instance 1 with 50 items, weight 15.14 tons, volume 41.42 CBM.
+INFO 2025-09-19 14:19:32,067 views 13968 2840 Starting scenario 'Closed Body Truck HD - 32 FT Medium' with 89 items into Closed Body Truck HD - 32 FT Medium.
+INFO 2025-09-19 14:19:32,095 views 13968 2840 Scenario 'Closed Body Truck HD - 32 FT Medium' complete. Used 1 containers. Remaining items: 16.
+INFO 2025-09-19 14:19:35,593 views 13968 2840 Packed container Closed Body Truck HD - 32 FT Medium instance 1 with 64 items, weight 17.29 tons, volume 40.80 CBM.
+INFO 2025-09-19 14:19:35,598 views 13968 2840 Starting scenario 'Closed Body Truck XL - 32 FT High' with 89 items into Closed Body Truck XL - 32 FT High.
+INFO 2025-09-19 14:19:35,650 views 13968 2840 Scenario 'Closed Body Truck XL - 32 FT High' complete. Used 1 containers. Remaining items: 11.
+INFO 2025-09-19 14:19:38,982 views 13968 2840 Packed container Closed Body Truck XL - 32 FT High instance 1 with 55 items, weight 23.07 tons, volume 43.58 CBM.
+INFO 2025-09-19 14:19:39,124 basehttp 13968 2840 "POST / HTTP/1.1" 200 618186
+INFO 2025-09-19 14:19:39,952 basehttp 13968 2840 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813374
+INFO 2025-09-19 14:19:40,009 basehttp 13968 13996 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781864
+INFO 2025-09-19 14:19:40,084 basehttp 13968 21084 "GET /static/optimization/3d_model_1_0.html HTTP/1.1" 200 4813477
+INFO 2025-09-19 14:19:40,322 basehttp 13968 1660 "GET /static/optimization/3d_model_1_1.html HTTP/1.1" 200 4781462
+INFO 2025-09-19 14:19:41,964 basehttp 13968 25864 "GET /static/optimization/3d_model_2_1.html HTTP/1.1" 200 4782444
+INFO 2025-09-19 14:19:41,997 basehttp 13968 2840 "GET /static/optimization/3d_model_2_0.html HTTP/1.1" 200 4816792
+INFO 2025-09-19 14:19:45,265 basehttp 13968 13996 "GET /static/optimization/3d_model_3_0.html HTTP/1.1" 200 4814259
+INFO 2025-09-19 14:19:45,283 basehttp 13968 20724 "GET /static/optimization/3d_model_3_1.html HTTP/1.1" 200 4784691
+INFO 2025-09-19 14:19:47,616 basehttp 13968 1660 "GET /static/optimization/3d_model_5_0.html HTTP/1.1" 200 4817358
+INFO 2025-09-19 14:19:47,619 basehttp 13968 21084 "GET /static/optimization/3d_model_4_0.html HTTP/1.1" 200 4809462
+INFO 2025-09-19 14:19:48,070 basehttp 13968 25864 "GET /static/optimization/3d_model_6_0.html HTTP/1.1" 200 4813236
+WARNING 2025-09-19 14:20:09,704 log 13968 25864 Not Found: /favicon.ico
+WARNING 2025-09-19 14:20:09,705 basehttp 13968 25864 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 14:20:20,073 views 13968 25864 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 14:20:20,076 views 13968 25864 Starting scenario 'Closed Body Truck - 20 FT' with 89 items into Closed Body Truck - 20 FT.
+INFO 2025-09-19 14:20:20,153 views 13968 25864 Scenario 'Closed Body Truck - 20 FT' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 14:20:23,173 views 13968 25864 Packed container Closed Body Truck - 20 FT instance 1 with 53 items, weight 8.94 tons, volume 17.74 CBM.
+INFO 2025-09-19 14:20:27,831 autoreload 1928 24596 Watching for file changes with StatReloader
+INFO 2025-09-19 14:20:30,828 views 1928 27372 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 14:20:30,829 views 1928 27372 Starting scenario 'Closed Body Truck - 20 FT' with 89 items into Closed Body Truck - 20 FT.
+INFO 2025-09-19 14:20:30,905 views 1928 27372 Scenario 'Closed Body Truck - 20 FT' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 14:20:33,512 views 1928 27372 Packed container Closed Body Truck - 20 FT instance 1 with 53 items, weight 8.94 tons, volume 17.74 CBM.
+INFO 2025-09-19 14:20:34,256 views 1928 27372 Packed container Closed Body Truck - 20 FT instance 2 with 7 items, weight 4.27 tons, volume 21.24 CBM.
+INFO 2025-09-19 14:20:34,265 views 1928 27372 Starting scenario 'Closed Body Truck - 24 FT' with 89 items into Closed Body Truck - 24 FT.
+INFO 2025-09-19 14:20:34,324 views 1928 27372 Scenario 'Closed Body Truck - 24 FT' complete. Used 2 containers. Remaining items: 12.
+INFO 2025-09-19 14:20:37,618 autoreload 12068 1380 Watching for file changes with StatReloader
+INFO 2025-09-19 14:20:44,729 basehttp 12068 21224 "GET / HTTP/1.1" 200 100153
+WARNING 2025-09-19 14:20:45,607 log 12068 21224 Not Found: /favicon.ico
+WARNING 2025-09-19 14:20:45,608 basehttp 12068 21224 "GET /favicon.ico HTTP/1.1" 404 2499
+INFO 2025-09-19 14:20:51,459 basehttp 12068 21224 "GET /get_container_sizes/8/ HTTP/1.1" 200 240
+INFO 2025-09-19 14:20:53,789 views 12068 21224 Expanded data to 89 individual items from 39 selected records.
+INFO 2025-09-19 14:20:53,790 views 12068 21224 Starting scenario 'Closed Body Truck - 20 FT' with 89 items into Closed Body Truck - 20 FT.
+INFO 2025-09-19 14:20:53,896 views 12068 21224 Scenario 'Closed Body Truck - 20 FT' complete. Used 2 containers. Remaining items: 15.
+INFO 2025-09-19 14:20:57,179 views 12068 21224 Packed container Closed Body Truck - 20 FT instance 1 with 53 items, weight 8.94 tons, volume 17.74 CBM.
+INFO 2025-09-19 14:20:58,497 views 12068 21224 Packed container Closed Body Truck - 20 FT instance 2 with 7 items, weight 4.27 tons, volume 21.24 CBM.
+INFO 2025-09-19 14:20:58,512 views 12068 21224 Starting scenario 'Closed Body Truck - 24 FT' with 89 items into Closed Body Truck - 24 FT.
+INFO 2025-09-19 14:20:58,589 views 12068 21224 Scenario 'Closed Body Truck - 24 FT' complete. Used 2 containers. Remaining items: 12.
+INFO 2025-09-19 14:21:02,818 views 12068 21224 Packed container Closed Body Truck - 24 FT instance 1 with 56 items, weight 9.94 tons, volume 25.14 CBM.
+INFO 2025-09-19 14:21:04,751 views 12068 21224 Packed container Closed Body Truck - 24 FT instance 2 with 6 items, weight 3.72 tons, volume 21.97 CBM.
+INFO 2025-09-19 14:21:04,757 views 12068 21224 Starting scenario 'Closed Body Truck - 28 FT' with 89 items into Closed Body Truck - 28 FT.
+INFO 2025-09-19 14:21:04,831 views 12068 21224 Scenario 'Closed Body Truck - 28 FT' complete. Used 2 containers. Remaining items: 4.
+INFO 2025-09-19 14:21:07,891 views 12068 21224 Packed container Closed Body Truck - 28 FT instance 1 with 60 items, weight 12.85 tons, volume 32.00 CBM.
+INFO 2025-09-19 14:21:09,614 views 12068 21224 Packed container Closed Body Truck - 28 FT instance 2 with 7 items, weight 4.45 tons, volume 28.51 CBM.
+INFO 2025-09-19 14:21:09,626 views 12068 21224 Starting scenario 'Closed Body Truck - 28–32 FT' with 89 items into Closed Body Truck - 28–32 FT.
+INFO 2025-09-19 14:21:09,685 views 12068 21224 Scenario 'Closed Body Truck - 28–32 FT' complete. Used 2 containers. Remaining items: 2.
+INFO 2025-09-19 14:21:12,552 views 12068 21224 Packed container Closed Body Truck - 28–32 FT instance 1 with 59 items, weight 12.97 tons, volume 36.59 CBM.
+INFO 2025-09-19 14:21:13,553 views 12068 21224 Packed container Closed Body Truck - 28–32 FT instance 2 with 11 items, weight 9.22 tons, volume 31.00 CBM.
+INFO 2025-09-19 14:21:13,556 views 12068 21224 Starting scenario 'Closed Body Truck - 32 FT' with 89 items into Closed Body Truck - 32 FT.
+INFO 2025-09-19 14:21:13,578 views 12068 21224 Scenario 'Closed Body Truck - 32 FT' complete. Used 1 containers. Remaining items: 18.
+INFO 2025-09-19 14:21:16,760 views 12068 21224 Packed container Closed Body Truck - 32 FT instance 1 with 50 items, weight 15.14 tons, volume 41.42 CBM.
+INFO 2025-09-19 14:21:16,766 views 12068 21224 Starting scenario 'Closed Body Truck HD - 32 FT Medium' with 89 items into Closed Body Truck HD - 32 FT Medium.
+INFO 2025-09-19 14:21:16,792 views 12068 21224 Scenario 'Closed Body Truck HD - 32 FT Medium' complete. Used 1 containers. Remaining items: 16.
+INFO 2025-09-19 14:21:19,994 views 12068 21224 Packed container Closed Body Truck HD - 32 FT Medium instance 1 with 64 items, weight 17.29 tons, volume 40.80 CBM.
+INFO 2025-09-19 14:21:19,997 views 12068 21224 Starting scenario 'Closed Body Truck XL - 32 FT High' with 89 items into Closed Body Truck XL - 32 FT High.
+INFO 2025-09-19 14:21:20,073 views 12068 21224 Scenario 'Closed Body Truck XL - 32 FT High' complete. Used 1 containers. Remaining items: 11.
+INFO 2025-09-19 14:21:23,502 views 12068 21224 Packed container Closed Body Truck XL - 32 FT High instance 1 with 55 items, weight 23.07 tons, volume 43.58 CBM.
+INFO 2025-09-19 14:21:23,623 basehttp 12068 21224 "POST / HTTP/1.1" 200 618186
+INFO 2025-09-19 14:21:24,413 basehttp 12068 21224 "GET /static/optimization/3d_model_0_0.html HTTP/1.1" 200 4813387
+INFO 2025-09-19 14:21:24,527 basehttp 12068 22064 "GET /static/optimization/3d_model_0_1.html HTTP/1.1" 200 4781864
+INFO 2025-09-19 14:21:24,612 basehttp 12068 15044 "GET /static/optimization/3d_model_1_1.html HTTP/1.1" 200 4781462
+INFO 2025-09-19 14:21:24,748 basehttp 12068 25836 "GET /static/optimization/3d_model_1_0.html HTTP/1.1" 200 4813490
+INFO 2025-09-19 14:21:27,169 basehttp 12068 21224 "GET /static/optimization/3d_model_2_0.html HTTP/1.1" 200 4816805
+INFO 2025-09-19 14:21:27,179 basehttp 12068 20148 "GET /static/optimization/3d_model_2_1.html HTTP/1.1" 200 4782444
+INFO 2025-09-19 14:21:29,134 basehttp 12068 25836 "GET /static/optimization/3d_model_4_0.html HTTP/1.1" 200 4809475
+INFO 2025-09-19 14:21:29,147 basehttp 12068 24632 "GET /static/optimization/3d_model_3_0.html HTTP/1.1" 200 4814272
+INFO 2025-09-19 14:21:31,952 basehttp 12068 15044 "GET /static/optimization/3d_model_3_1.html HTTP/1.1" 200 4784691
+INFO 2025-09-19 14:21:33,593 basehttp 12068 22064 "GET /static/optimization/3d_model_5_0.html HTTP/1.1" 200 4817371
+INFO 2025-09-19 14:21:35,051 basehttp 12068 21224 "GET /static/optimization/3d_model_6_0.html HTTP/1.1" 200 4813249
+INFO 2025-09-19 14:26:57,660 autoreload 12068 1380 C:\Users\Ayush\OneDrive - Crystal Hues Ltd\Desktop\new_and_improved_dcd\optimization\utils.py changed, reloading.
+INFO 2025-09-19 14:26:59,235 autoreload 6688 15308 Watching for file changes with StatReloader

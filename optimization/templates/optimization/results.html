@@ -19,9 +19,10 @@
                 {% for container in scenario.containers_used %}
                     <div class="bg-white dark:bg-gray-600 rounded p-4 mb-4">
                         <h4 class="text-lg font-medium mb-2">Container {{ forloop.counter }}: {{ container.container.name }} - {{ container.container.size }} (Instance {{ container.container_number }})</h4>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                             <p><strong>Total Weight Used:</strong> {{ container.total_weight|floatformat:2 }} tons</p>
                             <p><strong>Total Volume Used:</strong> {{ container.total_volume|floatformat:2 }} CBM</p>
+                            <p><strong>Total Items:</strong> {{ container.items|length }}</p>
                         </div>
                         <div class="mb-4">
                             <input type="text" id="search-{{ forloop.parentloop.counter }}-{{ forloop.counter }}" placeholder="Search by Query ID, Package Type, or Cargo Type..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-gray-100 dark:bg-gray-700">
@@ -71,9 +72,10 @@
             {% if scenario.remaining_items %}
             <div class="bg-white dark:bg-gray-600 rounded p-4 mb-4">
                 <h3 class="text-xl font-medium mb-2">Unstuffed Cargo</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <p><strong>Total Weight Remaining:</strong> {{ scenario.total_weight_remaining|floatformat:2 }} tons</p>
                     <p><strong>Total Volume Remaining:</strong> {{ scenario.total_volume_remaining|floatformat:2 }} CBM</p>
+                    <p><strong>Total Items:</strong> {{ scenario.remaining_items|length }}</p>
                 </div>
                 <div class="overflow-auto max-h-96">
                     <table class="min-w-full table-auto border-collapse border border-gray-300 text-sm">
