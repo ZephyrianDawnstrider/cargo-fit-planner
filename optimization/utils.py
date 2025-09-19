@@ -50,7 +50,7 @@ def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio=0.6, 
     else:
         return [], 0, 0
 
-def create_3d_model(container_length, container_breadth, container_height, items, output_path):
+def create_3d_model(container_length, container_breadth, container_height, items, output_path, animation=False):
     placed_items = []
     fig = go.Figure()
 
