@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import os
 
 colors = [
-    '#ff0026', '#e66b94', '#dd00ff', '#6600ff', '#8b99e7', '#0095ff', '#00fff2', '#00ff00', '#e5ff00', '#b1ab71',
+    '#ff0026', '#e66b94', '#dd00ff', '#6600ff', '#8b99e7', '#0095ff', '#00fff2', '#00ff00', "#4a5201", "#7a6e00",
     '#79725c', '#ff9d00', 'rgba(124, 96, 93, 1)', '#7a2900', '#854242', '#815959', '#f14a4a', '#5a5a5a', '#381010', '#520000'
 ]
 
@@ -61,7 +61,7 @@ def create_3d_model(container_length, container_breadth, container_height, items
         i=[0,0,4,4,0,0,3,3,0,0,1,1],
         j=[1,2,5,6,1,5,2,6,3,7,2,6],
         k=[2,3,6,7,5,4,6,7,7,4,6,5],
-        opacity=0.3,
+        opacity=0.1,
         color='lightblue',
         name='Container'
     ))
@@ -69,7 +69,7 @@ def create_3d_model(container_length, container_breadth, container_height, items
     # Define rules for each package type
     rules = {
         'General Goods': {'can_stack_on': True, 'must_be_on_top': False, 'near_exit': False, 'can_rotate': True},
-        'Dangerous Goods': {'can_stack_on': False, 'must_be_on_top': True, 'near_exit': True, 'can_rotate': False},
+        'Dangerous Goods': {'can_stack_on': False, 'must_be_on_top': False, 'near_exit': True, 'can_rotate': False},
         'Over-Dimension Cargo': {'can_stack_on': True, 'must_be_on_top': False, 'near_exit': False, 'can_rotate': True},
         'Breakable Goods': {'can_stack_on': False, 'must_be_on_top': True, 'near_exit': False, 'can_rotate': False},
         'Temperature-Controlled Goods': {'can_stack_on': False, 'must_be_on_top': False, 'near_exit': True, 'can_rotate': False},
@@ -82,13 +82,11 @@ def create_3d_model(container_length, container_breadth, container_height, items
     def sort_key(item):
         cargo_type = item.get('CargoType', 'General Goods')
         rule = rules.get(cargo_type, rules['General Goods'])
-        priority = 0
-        if rule['must_be_on_top'] or not rule['can_stack_on']:
-            priority = 2  # last
-        elif rule['near_exit']:
+        priority = 1
+        if rule['near_exit']:
             priority = 0  # first
-        else:
-            priority = 1
+        elif rule['must_be_on_top'] or not rule['can_stack_on']:
+            priority = 2  # last
         volume = float(item.get('Lenght', 1)) * float(item.get('Breadth', 1)) * float(item.get('Height', 1))
         return (priority, -volume)  # higher priority first, then larger volume first
 
@@ -99,6 +97,17 @@ def create_3d_model(container_length, container_breadth, container_height, items
     num_x = int(container_length / grid_size) + 1
     num_y = int(container_breadth / grid_size) + 1
     height_map = [[0.0 for _ in range(num_y)] for _ in range(num_x)]
+
+    # List to track placed boxes for collision detection
+    placed_boxes = []
+
+    def boxes_overlap(box1, box2):
+        """Check if two boxes overlap in 3D space."""
+        return not (
+            box1['xmax'] <= box2['xmin'] or box1['xmin'] >= box2['xmax'] or
+            box1['ymax'] <= box2['ymin'] or box1['ymin'] >= box2['ymax'] or
+            box1['zmax'] <= box2['zmin'] or box1['zmin'] >= box2['zmax']
+        )
 
     for item in items:
         l = float(item.get('Lenght', 1)) / 100  # Convert cm to m
@@ -115,9 +124,10 @@ def create_3d_model(container_length, container_breadth, container_height, items
         x_range = range(0, int((container_length - l) / step) + 1)
         y_range = range(0, int((container_breadth - b) / step) + 1)
 
-        # For near_exit, prefer low x
+        # For near_exit, prefer low x and low y
         if rule['near_exit']:
             x_range = sorted(x_range, key=lambda ix: ix * step)  # low x first
+            y_range = sorted(y_range, key=lambda iy: iy * step)  # low y first
 
         for ix in x_range:
             x = ix * step
@@ -129,10 +139,19 @@ def create_3d_model(container_length, container_breadth, container_height, items
                 end_gx = int((x + l) / grid_size)
                 start_gy = int(y / grid_size)
                 end_gy = int((y + b) / grid_size)
+                min_z_here = float('inf')
                 for gx in range(start_gx, end_gx + 1):
                     for gy in range(start_gy, end_gy + 1):
                         if 0 <= gx < num_x and 0 <= gy < num_y:
-                            max_z_here = max(max_z_here, height_map[gx][gy])
+                            z_val = height_map[gx][gy]
+                            max_z_here = max(max_z_here, z_val)
+                            min_z_here = min(min_z_here, z_val)
+                # Skip if the surface is not flat
+                if min_z_here != max_z_here:
+                    continue
+                # For dangerous goods, ensure on ground and nothing below
+                if rule['near_exit'] and max_z_here > 0:
+                    continue  # skip if not on ground
                 # For must_be_on_top, place at highest z only if not on non-stackable
                 if rule['must_be_on_top']:
                     if max_z_here < container_height:
@@ -140,9 +159,21 @@ def create_3d_model(container_length, container_breadth, container_height, items
                     else:
                         continue  # can't place on non-stackable
                 if max_z_here + h <= container_height and max_z_here < best_z:
-                    best_z = max_z_here
-                    best_x = x
-                    best_y = y
+                    # Check for overlap with placed boxes
+                    proposed_box = {
+                        'xmin': x, 'xmax': x + l,
+                        'ymin': y, 'ymax': y + b,
+                        'zmin': max_z_here, 'zmax': max_z_here + h
+                    }
+                    overlap = False
+                    for placed_box in placed_boxes:
+                        if boxes_overlap(proposed_box, placed_box):
+                            overlap = True
+                            break
+                    if not overlap:
+                        best_z = max_z_here
+                        best_x = x
+                        best_y = y
         if best_x is not None:
             # Place item
             fig.add_trace(go.Mesh3d(
@@ -153,7 +184,7 @@ def create_3d_model(container_length, container_breadth, container_height, items
                 j=[1, 2, 3, 5, 5, 6, 6, 7, 1, 2, 2, 6],
                 k=[2, 3, 0, 6, 6, 7, 7, 2, 5, 5, 3, 3],
                 color=color,
-                opacity=0.8,
+                opacity=1.0,
                 hoverinfo='text',
                 hovertext=f"Query ID: {item.get('queryid')}<br>ID: {item.get('id')}<br>Package Type: {item.get('PackageType')}<br>Cargo Type: {cargo_type}<br>Dimensions: {l*100:.0f}×{b*100:.0f}×{h*100:.0f} cm<br>Weight: {item.get('weight_tons', 0):.3f} tons<br>Volume: {item.get('volume_cbm', 0):.3f} CBM",
                 name=f"Q{item.get('queryid')}-I{item.get('id')}"
@@ -166,6 +197,13 @@ def create_3d_model(container_length, container_breadth, container_height, items
                 for gy in range(int(best_y / grid_size), int((best_y + b) / grid_size) + 1):
                     if 0 <= gx < num_x and 0 <= gy < num_y:
                         height_map[gx][gy] = new_height
+
+            # Add to placed boxes
+            placed_boxes.append({
+                'xmin': best_x, 'xmax': best_x + l,
+                'ymin': best_y, 'ymax': best_y + b,
+                'zmin': best_z, 'zmax': best_z + h
+            })
 
     fig.update_layout(scene=dict(
         xaxis_title='Length (m)',
