@@ -16,7 +16,7 @@ def get_color(queryid, id_val):
     hash_val = abs(hash(key)) % len(colors)
     return colors[hash_val]
 
-def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio=0.6, min_volume_ratio=0.7):
+def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio=0.9, min_volume_ratio=0.9):
     required_columns = ['weight_tons', 'volume_cbm']
     if not all(col in data.columns for col in required_columns):
         return [], 0, 0
@@ -49,6 +49,95 @@ def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio=0.6, 
         return selected_packages, total_weight_used, total_volume_used
     else:
         return [], 0, 0
+
+def mixed_bin_packing(cargo_df, available_containers, output_dir):
+    """
+    Perform mixed bin packing using available container types to minimize number of containers.
+    Heuristic: Sort containers by volume descending, greedily pack into largest suitable container.
+    """
+    import os
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("Starting mixed_bin_packing function")
+    logger.info(f"Input: cargo_df shape {cargo_df.shape}, available_containers count {len(available_containers)}, output_dir {output_dir}")
+
+    # Sort containers by volume descending
+    available_containers = sorted(available_containers, key=lambda c: float(c.volume_cbm), reverse=True)
+    logger.info(f"Sorted available_containers by volume descending: {[f'{c.name}-{c.size}:{c.volume_cbm}' for c in available_containers]}")
+
+    containers_used = []
+    remaining_data = cargo_df.copy()
+    container_counter = 0
+    model_images = []
+    logger.info(f"Initial remaining_data shape: {remaining_data.shape}")
+
+    while not remaining_data.empty:
+        logger.info(f"Loop start: remaining_data shape {remaining_data.shape}")
+        total_remaining_weight = remaining_data['weight_tons'].sum()
+        total_remaining_volume = remaining_data['volume_cbm'].sum()
+        logger.info(f"Total remaining weight: {total_remaining_weight} tons, volume: {total_remaining_volume} CBM")
+
+        # Choose the best container: largest that can fit remaining total, else largest overall
+        suitable = [c for c in available_containers if float(c.maxpayload_kg) / 1000 >= total_remaining_weight and float(c.volume_cbm) >= total_remaining_volume]
+        logger.info(f"Suitable containers: {[f'{c.name}-{c.size}' for c in suitable]}")
+        if suitable:
+            chosen = suitable[0]  # already sorted
+            logger.info(f"Chosen container (fits all): {chosen.name}-{chosen.size}")
+        else:
+            chosen = available_containers[0]
+            logger.info(f"Chosen container (largest): {chosen.name}-{chosen.size}")
+
+        # Pack subset into chosen
+        logger.info(f"Calling optimize_packages with capacity weight {float(chosen.maxpayload_kg) / 1000}, volume {float(chosen.volume_cbm)}")
+        selected_indices, _, _ = optimize_packages(remaining_data, float(chosen.maxpayload_kg) / 1000, float(chosen.volume_cbm))
+        logger.info(f"optimize_packages returned selected_indices: {len(selected_indices) if selected_indices else 0}")
+        if not selected_indices:
+            logger.info("No items selected, breaking loop")
+            break
+
+        selected_items = remaining_data.iloc[selected_indices]
+        logger.info(f"Selected items shape: {selected_items.shape}")
+        container_counter += 1
+        items_list = selected_items.to_dict('records')
+        logger.info(f"Items list length: {len(items_list)}")
+        for item in items_list:
+            item['color'] = get_color(item['queryid'], item['id'])
+            logger.debug(f"Assigned color to item {item['queryid']}-{item['id']}: {item['color']}")
+
+        # Create 3D model
+        output_path = f'{output_dir}/3d_model_mixed_{container_counter}.html'
+        logger.info(f"Creating 3D model at {output_path}")
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        placed_items = create_3d_model(float(chosen.length_m), float(chosen.breadth_m), float(chosen.height_m), items_list, output_path)
+        logger.info(f"3D model created, placed_items length: {len(placed_items)}")
+
+        total_weight_placed = sum(item['weight_tons'] for item in placed_items)
+        total_volume_placed = sum(item['volume_cbm'] for item in placed_items)
+        logger.info(f"Placed total weight: {total_weight_placed}, volume: {total_volume_placed}")
+
+        containers_used.append({
+            'container': chosen,
+            'container_number': container_counter,
+            'items': placed_items,
+            'total_weight': total_weight_placed,
+            'total_volume': total_volume_placed
+        })
+        model_images.append(f'optimization/3d_model_mixed_{container_counter}.html')
+        logger.info(f"Added container {container_counter} to used list")
+
+        # Update remaining
+        logger.info(f"Dropping selected indices: {selected_indices}")
+        remaining_data = remaining_data.drop(selected_indices).reset_index(drop=True)
+        unplaced = [item for item in items_list if item not in placed_items]
+        logger.info(f"Unplaced items: {len(unplaced)}")
+        if unplaced:
+            unplaced_df = pd.DataFrame(unplaced)
+            logger.info(f"Concatenating unplaced_df shape {unplaced_df.shape} to remaining_data")
+            remaining_data = pd.concat([remaining_data, unplaced_df], ignore_index=True)
+        logger.info(f"End of loop: remaining_data shape {remaining_data.shape}")
+
+    logger.info(f"Mixed bin packing complete: used {len(containers_used)} containers, remaining items {len(remaining_data)}")
+    return containers_used, model_images, remaining_data
 
 def create_3d_model(container_length, container_breadth, container_height, items, output_path, animation=False):
     placed_items = []
