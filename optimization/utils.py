@@ -77,15 +77,22 @@ def mixed_bin_packing(cargo_df, available_containers, output_dir):
         total_remaining_volume = remaining_data['volume_cbm'].sum()
         logger.info(f"Total remaining weight: {total_remaining_weight} tons, volume: {total_remaining_volume} CBM")
 
-        # Choose the best container: largest that can fit remaining total, else largest overall
-        suitable = [c for c in available_containers if float(c.maxpayload_kg) / 1000 >= total_remaining_weight and float(c.volume_cbm) >= total_remaining_volume]
-        logger.info(f"Suitable containers: {[f'{c.name}-{c.size}' for c in suitable]}")
-        if suitable:
-            chosen = suitable[0]  # already sorted
-            logger.info(f"Chosen container (fits all): {chosen.name}-{chosen.size}")
+        # Choose the best container: the one that can pack the most items
+        best_container = None
+        max_packed = 0
+        for c in available_containers:
+            selected_indices, _, _ = optimize_packages(remaining_data, float(c.maxpayload_kg) / 1000, float(c.volume_cbm))
+            num_packed = len(selected_indices)
+            if num_packed > max_packed:
+                max_packed = num_packed
+                best_container = c
+        if best_container:
+            chosen = best_container
+            logger.info(f"Chosen container (packs most items: {max_packed}): {chosen.name}-{chosen.size}")
         else:
+            # Fallback, though unlikely
             chosen = available_containers[0]
-            logger.info(f"Chosen container (largest): {chosen.name}-{chosen.size}")
+            logger.info(f"Chosen container (fallback): {chosen.name}-{chosen.size}")
 
         # Pack subset into chosen
         logger.info(f"Calling optimize_packages with capacity weight {float(chosen.maxpayload_kg) / 1000}, volume {float(chosen.volume_cbm)}")
