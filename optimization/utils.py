@@ -46,6 +46,9 @@ def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio=0.9, 
         selected_packages = [i for i in range(num_packages) if x[i].solution_value() > 0.5]
         total_weight_used = sum(data.loc[i, 'weight_tons'] for i in selected_packages)
         total_volume_used = sum(data.loc[i, 'volume_cbm'] for i in selected_packages)
+        # Enforce minimum constraints as the solver may not strictly adhere
+        if total_weight_used < min_weight_ratio * carry_capacity or total_volume_used < min_volume_ratio * carry_volume:
+            return [], 0, 0
         return selected_packages, total_weight_used, total_volume_used
     else:
         return [], 0, 0
@@ -170,7 +173,6 @@ def create_3d_model(container_length, container_breadth, container_height, items
         'Over-Dimension Cargo': {'can_stack_on': True, 'must_be_on_top': False, 'near_exit': False, 'can_rotate': True},
         'Breakable Goods': {'can_stack_on': False, 'must_be_on_top': True, 'near_exit': False, 'can_rotate': False},
         'Temperature-Controlled Goods': {'can_stack_on': False, 'must_be_on_top': False, 'near_exit': True, 'can_rotate': False},
-        # 'Non-Stackable Cargo': {'can_stack_on': False, 'must_be_on_top': True, 'near_exit': False, 'can_rotate': True},
         'Non-Stackable': {'can_stack_on': False, 'must_be_on_top': True, 'near_exit': False, 'can_rotate': True},
         'Non-Tiltable Cargo': {'can_stack_on': True, 'must_be_on_top': False, 'near_exit': False, 'can_rotate': False}
     }
@@ -216,77 +218,79 @@ def create_3d_model(container_length, container_breadth, container_height, items
 
         color = item.get('color', get_color(item.get('queryid'), item.get('id')))
 
-        # Find best position
-        best_x, best_y, best_z = None, None, float('inf')
-        step = grid_size
-        x_range = range(0, int((container_length - l) / step) + 1)
-        y_range = range(0, int((container_breadth - b) / step) + 1)
+        # Try different orientations if can_rotate
+        orientations = [(l, b, h)]
+        if rule['can_rotate']:
+            orientations = [(l, b, h), (l, h, b), (b, l, h), (b, h, l), (h, l, b), (h, b, l)]
 
-        # For near_exit, prefer low x and low y
-        if rule['near_exit']:
-            x_range = sorted(x_range, key=lambda ix: ix * step)  # low x first
-            y_range = sorted(y_range, key=lambda iy: iy * step)  # low y first
+        best_x, best_y, best_z, best_ol, best_ob, best_oh = None, None, float('inf'), l, b, h
 
-        for ix in x_range:
-            x = ix * step
-            for iy in y_range:
-                y = iy * step
-                # Get max_z in the area
-                max_z_here = 0
-                start_gx = int(x / grid_size)
-                end_gx = int((x + l) / grid_size)
-                start_gy = int(y / grid_size)
-                end_gy = int((y + b) / grid_size)
-                min_z_here = float('inf')
-                for gx in range(start_gx, end_gx + 1):
-                    for gy in range(start_gy, end_gy + 1):
-                        if 0 <= gx < num_x and 0 <= gy < num_y:
-                            z_val = height_map[gx][gy]
-                            max_z_here = max(max_z_here, z_val)
-                            min_z_here = min(min_z_here, z_val)
-                # Skip if the surface is not flat
-                if min_z_here != max_z_here:
-                    continue
-                # For dangerous goods, ensure on ground and nothing below
-                if rule['near_exit'] and max_z_here > 0:
-                    continue  # skip if not on ground
-                # For must_be_on_top, place at highest z only if not on non-stackable
-                if rule['must_be_on_top']:
-                    if max_z_here < container_height:
-                        max_z_here = container_height - h  # place on top
-                    else:
-                        continue  # can't place on non-stackable
-                if max_z_here + h <= container_height and max_z_here < best_z:
-                    # Check for overlap with placed boxes
-                    proposed_box = {
-                        'xmin': x, 'xmax': x + l,
-                        'ymin': y, 'ymax': y + b,
-                        'zmin': max_z_here, 'zmax': max_z_here + h
-                    }
-                    overlap = False
-                    for placed_box in placed_boxes:
-                        if boxes_overlap(proposed_box, placed_box):
-                            overlap = True
-                            break
-                    if not overlap:
-                        best_z = max_z_here
-                        best_x = x
-                        best_y = y
+        for ol, ob, oh in orientations:
+            # Find best position for this orientation
+            step = grid_size
+            x_range = range(0, int((container_length - ol) / step) + 1)
+            y_range = range(0, int((container_breadth - ob) / step) + 1)
+
+            # For near_exit, prefer low x and low y
+            if rule['near_exit']:
+                x_range = sorted(x_range, key=lambda ix: ix * step)  # low x first
+                y_range = sorted(y_range, key=lambda iy: iy * step)  # low y first
+
+            for ix in x_range:
+                x = ix * step
+                for iy in y_range:
+                    y = iy * step
+                    # Get max_z in the area
+                    max_z_here = 0
+                    start_gx = int(x / grid_size)
+                    end_gx = int((x + ol) / grid_size)
+                    start_gy = int(y / grid_size)
+                    end_gy = int((y + ob) / grid_size)
+                    min_z_here = float('inf')
+                    for gx in range(start_gx, end_gx + 1):
+                        for gy in range(start_gy, end_gy + 1):
+                            if 0 <= gx < num_x and 0 <= gy < num_y:
+                                z_val = height_map[gx][gy]
+                                max_z_here = max(max_z_here, z_val)
+                                min_z_here = min(min_z_here, z_val)
+                    # Skip if the surface is not flat
+                    if min_z_here != max_z_here:
+                        continue
+                    # For dangerous goods, ensure on ground and nothing below
+                    if rule['near_exit'] and max_z_here > 0:
+                        continue  # skip if not on ground
+                    if max_z_here + oh <= container_height and max_z_here < best_z:
+                        # Check for overlap with placed boxes
+                        proposed_box = {
+                            'xmin': x, 'xmax': x + ol,
+                            'ymin': y, 'ymax': y + ob,
+                            'zmin': max_z_here, 'zmax': max_z_here + oh
+                        }
+                        overlap = False
+                        for placed_box in placed_boxes:
+                            if boxes_overlap(proposed_box, placed_box):
+                                overlap = True
+                                break
+                        if not overlap:
+                            best_z = max_z_here
+                            best_x = x
+                            best_y = y
+                            best_ol, best_ob, best_oh = ol, ob, oh
         if best_x is not None:
             packing_order += 1
             placed_items.append(item)
             # Place item
             fig.add_trace(go.Mesh3d(
-                x=[best_x, best_x+l, best_x+l, best_x, best_x, best_x+l, best_x+l, best_x],
-                y=[best_y, best_y, best_y+b, best_y+b, best_y, best_y, best_y+b, best_y+b],
-                z=[best_z, best_z, best_z, best_z, best_z+h, best_z+h, best_z+h, best_z+h],
+                x=[best_x, best_x+best_ol, best_x+best_ol, best_x, best_x, best_x+best_ol, best_x+best_ol, best_x],
+                y=[best_y, best_y, best_y+best_ob, best_y+best_ob, best_y, best_y, best_y+best_ob, best_y+best_ob],
+                z=[best_z, best_z, best_z, best_z, best_z+best_oh, best_z+best_oh, best_z+best_oh, best_z+best_oh],
                 i=[0, 0, 0, 1, 4, 4, 2, 6, 4, 0, 3, 7],
                 j=[1, 2, 3, 5, 5, 6, 6, 7, 1, 2, 2, 6],
                 k=[2, 3, 0, 6, 6, 7, 7, 2, 5, 5, 3, 3],
                 color=color,
                 opacity=1.0,
                 hoverinfo='text',
-                hovertext=f"Packing Order: {packing_order}<br>Query ID: {item.get('queryid')}<br>ID: {item.get('id')}<br>Package Type: {item.get('PackageType')}<br>Cargo Type: {cargo_type}<br>Dimensions: {l*100:.0f}×{b*100:.0f}×{h*100:.0f} cm<br>Weight: {item.get('weight_tons', 0):.3f} tons<br>Volume: {item.get('volume_cbm', 0):.3f} CBM",
+                hovertext=f"Packing Order: {packing_order}<br>Query ID: {item.get('queryid')}<br>ID: {item.get('id')}<br>Package Type: {item.get('PackageType')}<br>Cargo Type: {cargo_type}<br>Dimensions: {best_ol*100:.0f}×{best_ob*100:.0f}×{best_oh*100:.0f} cm<br>Weight: {item.get('weight_tons', 0):.3f} tons<br>Volume: {item.get('volume_cbm', 0):.3f} CBM",
                 name=f"Q{item.get('queryid')}-I{item.get('id')}"
             ))
 
@@ -299,19 +303,19 @@ def create_3d_model(container_length, container_breadth, container_height, items
                 with open(step_path, 'w', encoding='utf-8') as f:
                     f.write(html_content)
             # Update height_map
-            new_height = best_z + h
+            new_height = best_z + best_oh
             if not rule['can_stack_on']:
                 new_height = container_height  # prevent stacking on top
-            for gx in range(int(best_x / grid_size), int((best_x + l) / grid_size) + 1):
-                for gy in range(int(best_y / grid_size), int((best_y + b) / grid_size) + 1):
+            for gx in range(int(best_x / grid_size), int((best_x + best_ol) / grid_size) + 1):
+                for gy in range(int(best_y / grid_size), int((best_y + best_ob) / grid_size) + 1):
                     if 0 <= gx < num_x and 0 <= gy < num_y:
                         height_map[gx][gy] = new_height
 
             # Add to placed boxes
             placed_boxes.append({
-                'xmin': best_x, 'xmax': best_x + l,
-                'ymin': best_y, 'ymax': best_y + b,
-                'zmin': best_z, 'zmax': best_z + h
+                'xmin': best_x, 'xmax': best_x + best_ol,
+                'ymin': best_y, 'ymax': best_y + best_ob,
+                'zmin': best_z, 'zmax': best_z + best_oh
             })
 
     # Add hover and click events to highlight table rows
