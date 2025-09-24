@@ -6,6 +6,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import plotly.graph_objects as go
 import os
 import logging
+import concurrent.futures as cf
 
 logger = logging.getLogger(__name__)
 
@@ -164,9 +165,14 @@ def mixed_bin_packing(cargo_df, available_containers, output_dir):
     logger.info("Starting mixed_bin_packing function")
     logger.info(f"Input: cargo_df shape {cargo_df.shape}, available_containers count {len(available_containers)}, output_dir {output_dir}")
 
-    # Sort containers by volume ascending to prefer smaller containers
+    # Calculate initial total remaining weight and volume
+    total_remaining_weight = cargo_df['weight_tons'].sum()
+    total_remaining_volume = cargo_df['volume_cbm'].sum()
+    logger.info(f"Initial total remaining weight: {total_remaining_weight} tons, volume: {total_remaining_volume} CBM")
+
+    # Sort containers by volume ascending to prioritize smaller containers
     available_containers = sorted(available_containers, key=lambda c: float(c.volume_cbm))
-    logger.info(f"Sorted available_containers by volume ascending: {[f'{c.name}-{c.size}:{c.volume_cbm}' for c in available_containers]}")
+    logger.info(f"Sorted available_containers by volume ascending: {[f'{c.name}-{c.size}' for c in available_containers]}")
 
     containers_used = []
     remaining_data = cargo_df.copy()
@@ -180,11 +186,15 @@ def mixed_bin_packing(cargo_df, available_containers, output_dir):
         total_remaining_volume = remaining_data['volume_cbm'].sum()
         logger.info(f"Total remaining weight: {total_remaining_weight} tons, volume: {total_remaining_volume} CBM")
 
-        # Choose the best container: the one that can pack the most items
+        # Choose the best container: the one that can pack the most items using multi-threading
         best_container = None
         max_packed = 0
-        for c in available_containers:
-            selected_indices, _, _ = optimize_packages(remaining_data, float(c.maxpayload_kg) / 1000, float(c.volume_cbm))
+        def optimize_for_container(c):
+            return optimize_packages(remaining_data, float(c.maxpayload_kg) / 1000, float(c.volume_cbm))
+        with cf.ThreadPoolExecutor() as executor:
+            results = list(executor.map(optimize_for_container, available_containers))
+        for i, c in enumerate(available_containers):
+            selected_indices, _, _ = results[i]
             num_packed = len(selected_indices)
             if num_packed > max_packed:
                 max_packed = num_packed
@@ -256,15 +266,16 @@ def mixed_bin_packing(cargo_df, available_containers, output_dir):
         total_volume_placed = sum(item['volume_cbm'] for item in placed_items)
         logger.info(f"Placed total weight: {total_weight_placed}, volume: {total_volume_placed}")
 
-        containers_used.append({
-            'container': chosen,
-            'container_number': container_counter,
-            'items': placed_items,
-            'total_weight': total_weight_placed,
-            'total_volume': total_volume_placed
-        })
-        model_images.append(f'optimization/3d_model_mixed_{container_counter}.html')
-        logger.info(f"Added container {container_counter} to used list")
+        if placed_items:
+            containers_used.append({
+                'container': chosen,
+                'container_number': container_counter,
+                'items': placed_items,
+                'total_weight': total_weight_placed,
+                'total_volume': total_volume_placed
+            })
+            model_images.append(f'optimization/3d_model_mixed_{container_counter}.html')
+            logger.info(f"Added container {container_counter} to used list")
 
         # Update remaining
         logger.info(f"Dropping selected indices: {selected_indices}")
