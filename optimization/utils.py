@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import plotly.graph_objects as go
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 colors = [
     '#ff0026', '#e66b94', '#dd00ff', '#6600ff', '#8b99e7', '#0095ff', '#00fff2', '#00ff00', "#4a5201", "#7a6e00",
@@ -16,13 +19,90 @@ def get_color(queryid, id_val):
     hash_val = abs(hash(key)) % len(colors)
     return colors[hash_val]
 
+def validate_container_constraints(container, total_weight_used, total_volume_used, min_weight_ratio=0.9, min_volume_ratio=0.9):
+    """
+    Validate that container constraints are properly met.
+
+    Args:
+        container: Container object with maxpayload_kg and volume_cbm attributes
+        total_weight_used: Total weight used in tons
+        total_volume_used: Total volume used in CBM
+        min_weight_ratio: Minimum weight utilization ratio (default 0.9 for 90%)
+        min_volume_ratio: Minimum volume utilization ratio (default 0.9 for 90%)
+
+    Returns:
+        dict: Validation results with constraint status and details
+    """
+    logger.info(f"Validating constraints for container {container.name}-{container.size}: weight {total_weight_used:.3f} tons, volume {total_volume_used:.3f} CBM")
+    max_weight = float(container.maxpayload_kg) / 1000  # Convert kg to tons
+    max_volume = float(container.volume_cbm)
+    min_weight_required = min_weight_ratio * max_weight
+    min_volume_required = min_volume_ratio * max_volume
+
+    violations = []
+
+    # Check maximum constraints (critical)
+    if total_weight_used > max_weight:
+        violations.append({
+            'type': 'MAX_WEIGHT_EXCEEDED',
+            'message': f'Weight overload: {total_weight_used:.3f} tons > {max_weight:.3f} tons',
+            'severity': 'CRITICAL'
+        })
+        logger.error(f"Weight overload for container {container.name}-{container.size}: {total_weight_used:.3f} tons > {max_weight:.3f} tons")
+
+    if total_volume_used > max_volume:
+        violations.append({
+            'type': 'MAX_VOLUME_EXCEEDED',
+            'message': f'Volume overload: {total_volume_used:.3f} CBM > {max_volume:.3f} CBM',
+            'severity': 'CRITICAL'
+        })
+        logger.error(f"Volume overload for container {container.name}-{container.size}: {total_volume_used:.3f} CBM > {max_volume:.3f} CBM")
+
+    # Check minimum constraints (mandatory)
+    if total_weight_used < min_weight_required:
+        violations.append({
+            'type': 'MIN_WEIGHT_NOT_MET',
+            'message': f'Weight underutilization: {total_weight_used:.3f} tons < {min_weight_required:.3f} tons (90% required)',
+            'severity': 'WARNING'
+        })
+        logger.warning(f"Weight underutilization for container {container.name}-{container.size}: {total_weight_used:.3f} tons < {min_weight_required:.3f} tons")
+
+    if total_volume_used < min_volume_required:
+        violations.append({
+            'type': 'MIN_VOLUME_NOT_MET',
+            'message': f'Volume underutilization: {total_volume_used:.3f} CBM < {min_volume_required:.3f} CBM (90% required)',
+            'severity': 'WARNING'
+        })
+        logger.warning(f"Volume underutilization for container {container.name}-{container.size}: {total_volume_used:.3f} CBM < {min_volume_required:.3f} CBM")
+
+    logger.info(f"Validation complete for container {container.name}-{container.size}: is_valid={len(violations) == 0}, violations={len(violations)}")
+    return {
+        'is_valid': len(violations) == 0,
+        'violations': violations,
+        'utilization': {
+            'weight_ratio': total_weight_used / max_weight if max_weight > 0 else 0,
+            'volume_ratio': total_volume_used / max_volume if max_volume > 0 else 0,
+            'weight_efficiency': min(total_weight_used / max_weight, 1.0) if max_weight > 0 else 0,
+            'volume_efficiency': min(total_volume_used / max_volume, 1.0) if max_volume > 0 else 0
+        },
+        'constraints': {
+            'max_weight': max_weight,
+            'max_volume': max_volume,
+            'min_weight_required': min_weight_required,
+            'min_volume_required': min_volume_required
+        }
+    }
+
 def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio=0.9, min_volume_ratio=0.9):
+    logger.info(f"Starting optimize_packages with {len(data)} packages, capacity weight {carry_capacity:.3f} tons, volume {carry_volume:.3f} CBM")
     required_columns = ['weight_tons', 'volume_cbm']
     if not all(col in data.columns for col in required_columns):
+        logger.error("Required columns 'weight_tons' and 'volume_cbm' not found in data")
         return [], 0, 0
 
     solver = pywraplp.Solver.CreateSolver('SCIP')
     if not solver:
+        logger.error("Failed to create solver")
         return [], 0, 0
 
     num_packages = len(data)
@@ -31,26 +111,46 @@ def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio=0.9, 
     total_weight = solver.Sum(data.loc[i, 'weight_tons'] * x[i] for i in range(num_packages))
     total_volume = solver.Sum(data.loc[i, 'volume_cbm'] * x[i] for i in range(num_packages))
 
+    # Add maximum constraints (critical - never exceed capacity)
     solver.Add(total_weight <= carry_capacity)
     solver.Add(total_volume <= carry_volume)
-    solver.Add(total_weight >= min_weight_ratio * carry_capacity)
-    solver.Add(total_volume >= min_volume_ratio * carry_volume)
+
+    # Add minimum constraints (mandatory - must meet 90% utilization)
+    min_weight_required = min_weight_ratio * carry_capacity
+    min_volume_required = min_volume_ratio * carry_volume
+    solver.Add(total_weight >= min_weight_required)
+    solver.Add(total_volume >= min_volume_required)
 
     # Maximize number of packages
     objective = solver.Sum(x[i] for i in range(num_packages))
     solver.Maximize(objective)
 
     status = solver.Solve()
+    logger.info(f"Solver status: {status}")
 
     if status == pywraplp.Solver.OPTIMAL:
         selected_packages = [i for i in range(num_packages) if x[i].solution_value() > 0.5]
         total_weight_used = sum(data.loc[i, 'weight_tons'] for i in selected_packages)
         total_volume_used = sum(data.loc[i, 'volume_cbm'] for i in selected_packages)
-        # Enforce minimum constraints as the solver may not strictly adhere
-        if total_weight_used < min_weight_ratio * carry_capacity or total_volume_used < min_volume_ratio * carry_volume:
+        logger.info(f"Optimal solution found: {len(selected_packages)} packages selected, weight {total_weight_used:.3f} tons, volume {total_volume_used:.3f} CBM")
+
+        # Validate constraints are strictly met
+        if (total_weight_used > carry_capacity or
+            total_volume_used > carry_volume or
+            total_weight_used < min_weight_required or
+            total_volume_used < min_volume_required):
+            print("WARNING: Constraint violation detected!")
+            print(f"Weight: {total_weight_used:.3f}/{carry_capacity:.3f} tons (min required: {min_weight_required:.3f})")
+            print(f"Volume: {total_volume_used:.3f}/{carry_volume:.3f} CBM (min required: {min_volume_required:.3f})")
+            logger.warning("Constraint violation detected!")
+            logger.warning(f"Weight: {total_weight_used:.3f}/{carry_capacity:.3f} tons (min required: {min_weight_required:.3f})")
+            logger.warning(f"Volume: {total_volume_used:.3f}/{carry_volume:.3f} CBM (min required: {min_volume_required:.3f})")
             return [], 0, 0
+
         return selected_packages, total_weight_used, total_volume_used
     else:
+        print(f"Solver failed with status: {status}")
+        logger.error(f"Solver failed with status: {status}")
         return [], 0, 0
 
 def mixed_bin_packing(cargo_df, available_containers, output_dir):
@@ -64,9 +164,9 @@ def mixed_bin_packing(cargo_df, available_containers, output_dir):
     logger.info("Starting mixed_bin_packing function")
     logger.info(f"Input: cargo_df shape {cargo_df.shape}, available_containers count {len(available_containers)}, output_dir {output_dir}")
 
-    # Sort containers by volume descending
-    available_containers = sorted(available_containers, key=lambda c: float(c.volume_cbm), reverse=True)
-    logger.info(f"Sorted available_containers by volume descending: {[f'{c.name}-{c.size}:{c.volume_cbm}' for c in available_containers]}")
+    # Sort containers by volume ascending to prefer smaller containers
+    available_containers = sorted(available_containers, key=lambda c: float(c.volume_cbm))
+    logger.info(f"Sorted available_containers by volume ascending: {[f'{c.name}-{c.size}:{c.volume_cbm}' for c in available_containers]}")
 
     containers_used = []
     remaining_data = cargo_df.copy()
@@ -97,13 +197,44 @@ def mixed_bin_packing(cargo_df, available_containers, output_dir):
             chosen = available_containers[0]
             logger.info(f"Chosen container (fallback): {chosen.name}-{chosen.size}")
 
-        # Pack subset into chosen
+        # Pack subset into chosen with retry logic
         logger.info(f"Calling optimize_packages with capacity weight {float(chosen.maxpayload_kg) / 1000}, volume {float(chosen.volume_cbm)}")
-        selected_indices, _, _ = optimize_packages(remaining_data, float(chosen.maxpayload_kg) / 1000, float(chosen.volume_cbm))
+        selected_indices, total_weight_used, total_volume_used = optimize_packages(remaining_data, float(chosen.maxpayload_kg) / 1000, float(chosen.volume_cbm))
         logger.info(f"optimize_packages returned selected_indices: {len(selected_indices) if selected_indices else 0}")
+
+        # Validate that constraints are met
+        max_weight = float(chosen.maxpayload_kg) / 1000
+        max_volume = float(chosen.volume_cbm)
+        min_weight_required = 0.9 * max_weight
+        min_volume_required = 0.9 * max_volume
+
         if not selected_indices:
-            logger.info("No items selected, breaking loop")
-            break
+            logger.info("No items selected, trying smaller container")
+            # Try with a smaller container if available
+            available_containers = [c for c in available_containers if c != chosen]
+            if available_containers:
+                chosen = available_containers[0]
+                logger.info(f"Retrying with smaller container: {chosen.name}-{chosen.size}")
+                selected_indices, total_weight_used, total_volume_used = optimize_packages(remaining_data, float(chosen.maxpayload_kg) / 1000, float(chosen.volume_cbm))
+            else:
+                logger.info("No more containers available, breaking loop")
+                break
+
+        if selected_indices:
+            # Final validation
+            if (total_weight_used > max_weight or total_volume_used > max_volume or
+                total_weight_used < min_weight_required or total_volume_used < min_volume_required):
+                logger.warning(f"Container {chosen.name}-{chosen.size} constraint violation:")
+                logger.warning(f"Weight: {total_weight_used:.3f}/{max_weight:.3f} tons (min: {min_weight_required:.3f})")
+                logger.warning(f"Volume: {total_volume_used:.3f}/{max_volume:.3f} CBM (min: {min_volume_required:.3f})")
+                # Try to find a better container
+                for c in available_containers:
+                    if c != chosen:
+                        alt_indices, alt_weight, alt_volume = optimize_packages(remaining_data, float(c.maxpayload_kg) / 1000, float(c.volume_cbm))
+                        if alt_indices and alt_weight <= max_weight and alt_volume <= max_volume:
+                            chosen = c
+                            selected_indices, total_weight_used, total_volume_used = alt_indices, alt_weight, alt_volume
+                            logger.info(f"Switched to better container: {chosen.name}-{chosen.size}")
 
         selected_items = remaining_data.iloc[selected_indices]
         logger.info(f"Selected items shape: {selected_items.shape}")
@@ -150,6 +281,7 @@ def mixed_bin_packing(cargo_df, available_containers, output_dir):
     return containers_used, model_images, remaining_data
 
 def create_3d_model(container_length, container_breadth, container_height, items, output_path, animation=False):
+    logger.info(f"Starting create_3d_model with container {container_length:.2f}x{container_breadth:.2f}x{container_height:.2f} m, {len(items)} items, output {output_path}")
     placed_items = []
     fig = go.Figure()
 
@@ -279,6 +411,7 @@ def create_3d_model(container_length, container_breadth, container_height, items
         if best_x is not None:
             packing_order += 1
             placed_items.append(item)
+            logger.info(f"Placed item {item.get('queryid')}-{item.get('id')} at position ({best_x:.2f}, {best_y:.2f}, {best_z:.2f}) with dimensions {best_ol*100:.0f}x{best_ob*100:.0f}x{best_oh*100:.0f} cm")
             # Place item
             fig.add_trace(go.Mesh3d(
                 x=[best_x, best_x+best_ol, best_x+best_ol, best_x, best_x, best_x+best_ol, best_x+best_ol, best_x],
@@ -385,4 +518,5 @@ def create_3d_model(container_length, container_breadth, container_height, items
     html_content = html_content.replace('</body>', hover_script + '</body>')
     with open(output_path.replace('.png', '.html'), 'w', encoding='utf-8') as f:
         f.write(html_content)
+    logger.info(f"create_3d_model complete: {len(placed_items)} items placed out of {len(items)}")
     return placed_items

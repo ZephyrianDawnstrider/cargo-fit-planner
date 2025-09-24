@@ -208,6 +208,7 @@ def upload_view(request):
                 return render(request, 'optimization/results.html', context)
 
             except Exception as e:
+                logger.error(f"Exception occurred in upload_view: {str(e)}")
                 return render(request, 'optimization/upload.html', {'form': form, 'error': str(e)})
     else:
         form = UploadForm()
