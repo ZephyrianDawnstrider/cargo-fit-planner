@@ -7,3 +7,5 @@ django-mssql-backend
 pyodbc
 matplotlib
 plotly
+celery
+django-celery-results
