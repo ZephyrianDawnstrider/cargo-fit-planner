@@ -215,9 +215,11 @@ def upload_view(request):
 
     # Get dimensions for display
     dimensions = Dimensions.objects.all()
+    unique_cargo_types = list(Dimensions.objects.values_list('CargoType', flat=True).distinct())
     context = {
         'form': form,
-        'dimensions': dimensions
+        'dimensions': dimensions,
+        'unique_cargo_types': unique_cargo_types
     }
     return render(request, 'optimization/upload.html', context)
 

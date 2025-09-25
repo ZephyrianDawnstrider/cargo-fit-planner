@@ -128,38 +128,60 @@
             dropdownCssClass: "tailwind-select2"
         });
 
-        // Search functionality for cargo items
-        function filterRows() {
+        // Combined filter function for cargo items
+        function updateTable() {
             const queryId = document.getElementById('search-query-id').value.toLowerCase().trim();
             const id = document.getElementById('search-id').value.toLowerCase().trim();
+            const selectedCargoTypes = Array.from(document.querySelectorAll('.cargo-type-checkbox:checked')).map(cb => cb.value);
+            const itemsPerPage = document.getElementById('items-per-page').value;
             const rows = document.querySelectorAll('tbody tr');
+            let visibleCount = 0;
             rows.forEach(row => {
                 const rowQueryId = row.cells[1].textContent.toLowerCase().trim();
                 const rowId = row.cells[2].textContent.toLowerCase().trim();
+                const cargoType = row.cells[4].textContent.trim();
                 const matchesQueryId = rowQueryId.includes(queryId) || queryId === '';
                 const matchesId = rowId.includes(id) || id === '';
-                if (matchesQueryId && matchesId) {
+                const matchesCargo = selectedCargoTypes.length === 0 || selectedCargoTypes.includes(cargoType);
+                if (matchesQueryId && matchesId && matchesCargo && (itemsPerPage === 'max' || visibleCount < parseInt(itemsPerPage))) {
                     row.style.display = '';
+                    visibleCount++;
                 } else {
                     row.style.display = 'none';
                 }
             });
+            updateSelectedCount();
         }
 
-        document.getElementById('search-query-id').addEventListener('input', filterRows);
-        document.getElementById('search-id').addEventListener('input', filterRows);
+        document.getElementById('search-query-id').addEventListener('input', updateTable);
+        document.getElementById('search-id').addEventListener('input', updateTable);
 
-        // Update selected count
+        // Cargo type filter listeners
+        document.querySelectorAll('.cargo-type-checkbox').forEach(cb => {
+            cb.addEventListener('change', updateTable);
+        });
+        document.getElementById('select-all-cargo-types').addEventListener('change', function() {
+            document.querySelectorAll('.cargo-type-checkbox').forEach(cb => cb.checked = this.checked);
+            updateTable();
+        });
+
+        // Items per page listener
+        document.getElementById('items-per-page').addEventListener('change', updateTable);
+
+        // Update selected count based on visible items
         function updateSelectedCount() {
-            const selected = document.querySelectorAll('.dimension-checkbox:checked').length;
-            const total = {{ dimensions|length }};
-            document.getElementById('selected-count').textContent = selected + ' of ' + total + ' items selected';
+            const visibleRows = Array.from(document.querySelectorAll('tbody tr')).filter(row => row.style.display !== 'none');
+            const selected = visibleRows.filter(row => row.querySelector('.dimension-checkbox').checked).length;
+            const total = visibleRows.length;
+            document.getElementById('selected-count').textContent = selected + ' of ' + total + ' visible items selected';
         }
 
-        // Select all checkboxes functionality
+        // Select all checkboxes functionality (only visible)
         document.getElementById('select-all').addEventListener('change', function() {
-            const checkboxes = document.querySelectorAll('.dimension-checkbox');
-            checkboxes.forEach(cb => cb.checked = this.checked);
+            const visibleRows = Array.from(document.querySelectorAll('tbody tr')).filter(row => row.style.display !== 'none');
+            visibleRows.forEach(row => {
+                row.querySelector('.dimension-checkbox').checked = this.checked;
+            });
             updateSelectedDimensions();
             updateSelectedCount();
         });
@@ -249,6 +271,9 @@
                 document.getElementById('container-info').style.display = 'none';
             }
         });
+
+        // Initial update
+        updateTable();
     });
 </script>
 {% endblock %}
@@ -276,6 +301,35 @@
                     <div class="mb-4 grid grid-cols-1 md:grid-cols-2 gap-2">
                         <input type="text" id="search-query-id" placeholder="Search by Query ID..." class="border p-2 w-full bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
                         <input type="text" id="search-id" placeholder="Search by ID..." class="border p-2 w-full bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-800 dark:text-white mb-2">Filter by Cargo Type</label>
+                        <div id="cargo-type-container" class="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                            <label class="flex items-center mb-3 p-2 bg-white dark:bg-gray-600 rounded border cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-500 transition-colors">
+                                <input type="checkbox" id="select-all-cargo-types" checked class="mr-2">
+                                <span class="text-sm font-medium text-gray-800 dark:text-white">Select All Cargo Types</span>
+                            </label>
+                            <div class="grid grid-cols-1 gap-2">
+                                {% for cargo_type in unique_cargo_types %}
+                                <label class="flex items-center p-2 bg-white dark:bg-gray-600 rounded border cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-500 transition-colors">
+                                    <input type="checkbox" class="cargo-type-checkbox mr-2" value="{{ cargo_type }}" checked>
+                                    <span class="text-sm text-gray-800 dark:text-white">{{ cargo_type }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label for="items-per-page" class="block text-sm font-medium text-gray-800 dark:text-white mb-2">Items Shown</label>
+                        <select id="items-per-page" class="border p-2 w-full bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="30">30</option>
+                            <option value="40">40</option>
+                            <option value="50">50</option>
+                            <option value="70">70</option>
+                            <option value="max" selected>Max</option>
+                        </select>
                     </div>
                     <p id="selected-count" class="text-gray-800 dark:text-white">0 of {{ dimensions|length }} items selected</p>
                     <div class="overflow-auto max-h-96">
