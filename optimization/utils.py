@@ -15,12 +15,16 @@ colors = [
     '#79725c', '#ff9d00', 'rgba(124, 96, 93, 1)', '#7a2900', '#854242', '#815959', '#f14a4a', '#5a5a5a', '#381010', '#520000'
 ]
 
+min_weight_ratio=0.9
+min_volume_ratio=0.9
+
+
 def get_color(queryid, id_val):
     key = f"{queryid}-{id_val}"
     hash_val = abs(hash(key)) % len(colors)
     return colors[hash_val]
 
-def validate_container_constraints(container, total_weight_used, total_volume_used, min_weight_ratio=0.9, min_volume_ratio=0.9):
+def validate_container_constraints(container, total_weight_used, total_volume_used, min_weight_ratio, min_volume_ratio):
     """
     Validate that container constraints are properly met.
 
@@ -94,7 +98,7 @@ def validate_container_constraints(container, total_weight_used, total_volume_us
         }
     }
 
-def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio=0.9, min_volume_ratio=0.9):
+def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio, min_volume_ratio):
     logger.info(f"Starting optimize_packages with {len(data)} packages, capacity weight {carry_capacity:.3f} tons, volume {carry_volume:.3f} CBM")
     required_columns = ['weight_tons', 'volume_cbm']
     if not all(col in data.columns for col in required_columns):
@@ -126,10 +130,13 @@ def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio=0.9, 
     objective = solver.Sum(x[i] for i in range(num_packages))
     solver.Maximize(objective)
 
+    # Set a 5-second time limit (5000 milliseconds)
+    solver.SetTimeLimit(5000)
+
     status = solver.Solve()
     logger.info(f"Solver status: {status}")
 
-    if status == pywraplp.Solver.OPTIMAL:
+    if status == pywraplp.Solver.OPTIMAL or status == pywraplp.Solver.FEASIBLE:
         selected_packages = [i for i in range(num_packages) if x[i].solution_value() > 0.5]
         total_weight_used = sum(data.loc[i, 'weight_tons'] for i in selected_packages)
         total_volume_used = sum(data.loc[i, 'volume_cbm'] for i in selected_packages)
@@ -190,7 +197,7 @@ def mixed_bin_packing(cargo_df, available_containers, output_dir):
         best_container = None
         max_packed = 0
         def optimize_for_container(c):
-            return optimize_packages(remaining_data, float(c.maxpayload_kg) / 1000, float(c.volume_cbm), min_weight_ratio=0.9, min_volume_ratio=0.9)
+            return optimize_packages(remaining_data, float(c.maxpayload_kg) / 1000, float(c.volume_cbm), min_weight_ratio, min_volume_ratio)
         with cf.ThreadPoolExecutor() as executor:
             results = list(executor.map(optimize_for_container, available_containers))
         for i, c in enumerate(available_containers):
@@ -209,19 +216,19 @@ def mixed_bin_packing(cargo_df, available_containers, output_dir):
 
         # Pack subset into chosen with retry logic
         logger.info(f"Calling optimize_packages with capacity weight {float(chosen.maxpayload_kg) / 1000}, volume {float(chosen.volume_cbm)}")
-        selected_indices, total_weight_used, total_volume_used = optimize_packages(remaining_data, float(chosen.maxpayload_kg) / 1000, float(chosen.volume_cbm), min_weight_ratio=0.9, min_volume_ratio=0.9)
+        selected_indices, total_weight_used, total_volume_used = optimize_packages(remaining_data, float(chosen.maxpayload_kg) / 1000, float(chosen.volume_cbm), min_weight_ratio, min_volume_ratio)
         logger.info(f"optimize_packages returned selected_indices: {len(selected_indices) if selected_indices else 0}")
 
         # Validate that constraints are met
         max_weight = float(chosen.maxpayload_kg) / 1000
         max_volume = float(chosen.volume_cbm)
-        min_weight_required = 0 * max_weight
-        min_volume_required = 0 * max_volume
+        min_weight_required = min_weight_ratio * max_weight
+        min_volume_required = min_volume_ratio * max_volume
 
         if not selected_indices:
             logger.info("No items selected with minimum constraints, trying without minimum constraints")
             # Try without minimum constraints to pack remaining items
-            selected_indices, total_weight_used, total_volume_used = optimize_packages(remaining_data, float(chosen.maxpayload_kg) / 1000, float(chosen.volume_cbm), min_weight_ratio=0.9, min_volume_ratio=0.9)
+            selected_indices, total_weight_used, total_volume_used = optimize_packages(remaining_data, float(chosen.maxpayload_kg) / 1000, float(chosen.volume_cbm), min_weight_ratio, min_volume_ratio)
             if not selected_indices:
                 logger.info("No items selected even without minimum constraints, trying smaller container")
                 # Try with a smaller container if available
@@ -229,7 +236,7 @@ def mixed_bin_packing(cargo_df, available_containers, output_dir):
                 if available_containers:
                     chosen = available_containers[0]
                     logger.info(f"Retrying with smaller container: {chosen.name}-{chosen.size}")
-                    selected_indices, total_weight_used, total_volume_used = optimize_packages(remaining_data, float(chosen.maxpayload_kg) / 1000, float(chosen.volume_cbm), min_weight_ratio=0.9, min_volume_ratio=0.9)
+                    selected_indices, total_weight_used, total_volume_used = optimize_packages(remaining_data, float(chosen.maxpayload_kg) / 1000, float(chosen.volume_cbm), min_weight_ratio, min_volume_ratio)
                 else:
                     logger.info("No more containers available, breaking loop")
                     break
@@ -244,7 +251,7 @@ def mixed_bin_packing(cargo_df, available_containers, output_dir):
                 # Try to find a better container
                 for c in available_containers:
                     if c != chosen:
-                        alt_indices, alt_weight, alt_volume = optimize_packages(remaining_data, float(c.maxpayload_kg) / 1000, float(c.volume_cbm), min_weight_ratio=0.9, min_volume_ratio=0.9)
+                        alt_indices, alt_weight, alt_volume = optimize_packages(remaining_data, float(c.maxpayload_kg) / 1000, float(c.volume_cbm), min_weight_ratio, min_volume_ratio)
                         if alt_indices and alt_weight <= max_weight and alt_volume <= max_volume:
                             chosen = c
                             selected_indices, total_weight_used, total_volume_used = alt_indices, alt_weight, alt_volume
