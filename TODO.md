@@ -1,4 +1,2 @@
-- [ ] Remove minimum utilization constraints in optimize_packages calls to allow underutilized packing
-- [ ] Fix retry logic in mixed_bin_packing to use min_ratio=0 when initial packing fails
-- [ ] Enable rotation for all cargo types if needed
-- [ ] Test the changes
+- [x] Fix placed_boxes in create_3d_model to store dicts instead of lists for collision detection
+- [ ] Test the fix by running the optimization code

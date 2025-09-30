@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import os
 import logging
 import concurrent.futures as cf
+from functools import partial
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,11 @@ colors = [
 
 min_weight_ratio=0.9
 min_volume_ratio=0.9
+
+
+def optimize_for_container(container_params, remaining_data, min_weight_ratio, min_volume_ratio):
+    carry_capacity, carry_volume = container_params
+    return optimize_packages(remaining_data, carry_capacity, carry_volume, min_weight_ratio, min_volume_ratio)
 
 
 def get_color(queryid, id_val):
@@ -130,8 +136,8 @@ def optimize_packages(data, carry_capacity, carry_volume, min_weight_ratio, min_
     objective = solver.Sum(x[i] for i in range(num_packages))
     solver.Maximize(objective)
 
-    # Set a 5-second time limit (5000 milliseconds)
-    solver.SetTimeLimit(5000)
+    # Set a 15-second time limit (15000 milliseconds)
+    solver.SetTimeLimit(15000)
 
     status = solver.Solve()
     logger.info(f"Solver status: {status}")
@@ -196,10 +202,10 @@ def mixed_bin_packing(cargo_df, available_containers, output_dir):
         # Choose the best container: the one that can pack the most items using multi-threading
         best_container = None
         max_packed = 0
-        def optimize_for_container(c):
-            return optimize_packages(remaining_data, float(c.maxpayload_kg) / 1000, float(c.volume_cbm), min_weight_ratio, min_volume_ratio)
-        with cf.ThreadPoolExecutor() as executor:
-            results = list(executor.map(optimize_for_container, available_containers))
+        container_params = [(float(c.maxpayload_kg) / 1000, float(c.volume_cbm)) for c in available_containers]
+        func = partial(optimize_for_container, remaining_data=remaining_data, min_weight_ratio=min_weight_ratio, min_volume_ratio=min_volume_ratio)
+        with cf.ProcessPoolExecutor() as executor:
+            results = list(executor.map(func, container_params))
         for i, c in enumerate(available_containers):
             selected_indices, _, _ = results[i]
             num_packed = len(selected_indices)
@@ -270,7 +276,7 @@ def mixed_bin_packing(cargo_df, available_containers, output_dir):
         output_path = f'{output_dir}/3d_model_mixed_{container_counter}.html'
         logger.info(f"Creating 3D model at {output_path}")
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        placed_items = create_3d_model(float(chosen.length_m), float(chosen.breadth_m), float(chosen.height_m), items_list, output_path)
+        placed_items = create_3d_model(float(chosen.length_m), float(chosen.breadth_m), float(chosen.height_m), float(chosen.maxpayload_kg), items_list, output_path)
         logger.info(f"3D model created, placed_items length: {len(placed_items)}")
 
         total_weight_placed = sum(item['weight_tons'] for item in placed_items)
@@ -302,8 +308,8 @@ def mixed_bin_packing(cargo_df, available_containers, output_dir):
     logger.info(f"Mixed bin packing complete: used {len(containers_used)} containers, remaining items {len(remaining_data)}")
     return containers_used, model_images, remaining_data
 
-def create_3d_model(container_length, container_breadth, container_height, items, output_path, animation=False):
-    logger.info(f"Starting create_3d_model with container {container_length:.2f}x{container_breadth:.2f}x{container_height:.2f} m, {len(items)} items, output {output_path}")
+def create_3d_model(container_length, container_breadth, container_height, container_max_weight, items, output_path, animation=False):
+    logger.info(f"Starting create_3d_model with container {container_length:.2f}x{container_breadth:.2f}x{container_height:.2f} m, max weight {container_max_weight / 1000:.3f} tons, {len(items)} items, output {output_path}")
     placed_items = []
     fig = go.Figure()
 
@@ -346,7 +352,7 @@ def create_3d_model(container_length, container_breadth, container_height, items
     items.sort(key=sort_key)
 
     # Initialize height map for stacking
-    grid_size = 0.1  # 10 cm grid
+    grid_size = 0.1  # 10 cm grid for speed
     num_x = int(container_length / grid_size) + 1
     num_y = int(container_breadth / grid_size) + 1
     height_map = [[0.0 for _ in range(num_y)] for _ in range(num_x)]
@@ -467,11 +473,7 @@ def create_3d_model(container_length, container_breadth, container_height, items
                         height_map[gx][gy] = new_height
 
             # Add to placed boxes
-            placed_boxes.append({
-                'xmin': best_x, 'xmax': best_x + best_ol,
-                'ymin': best_y, 'ymax': best_y + best_ob,
-                'zmin': best_z, 'zmax': best_z + best_oh
-            })
+            placed_boxes.append({'xmin': best_x, 'xmax': best_x + best_ol, 'ymin': best_y, 'ymax': best_y + best_ob, 'zmin': best_z, 'zmax': best_z + best_oh})
 
     # Add hover and click events to highlight table rows
     hover_script = """
