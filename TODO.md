@@ -1,2 +1,6 @@
-- [x] Fix placed_boxes in create_3d_model to store dicts instead of lists for collision detection
-- [ ] Test the fix by running the optimization code
+- [x] Add reportlab to requirements.txt for PDF generation
+- [x] Update optimization/views.py to add download_plan view for generating Excel and PDF files with stuffed data, order, and 3D model info
+- [x] Update optimization/urls.py to include URL for download_plan
+- [x] Modify optimization/templates/optimization/results.html to add download section with buttons for Excel, PDF, and 3D model downloads
+- [x] Install reportlab via pip install reportlab
+- [x] Test the download functionality by running the server and verifying file downloads

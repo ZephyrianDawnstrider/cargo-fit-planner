@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from .forms import UploadForm
 from .models import Dimensions, Containertypes
 from .utils import optimize_packages, create_3d_model, get_color, mixed_bin_packing
@@ -7,8 +7,30 @@ import pandas as pd
 import json
 import os
 import logging
+from openpyxl import Workbook
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+import zipfile
+from io import BytesIO
+from decimal import Decimal
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+def make_serializable(obj):
+    if isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, datetime):
+        return obj.isoformat()
+    elif hasattr(obj, '_meta'):  # Django model
+        return {field.name: make_serializable(getattr(obj, field.name)) for field in obj._meta.fields}
+    elif isinstance(obj, dict):
+        return {k: make_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [make_serializable(item) for item in obj]
+    else:
+        return obj
 
 def upload_view(request):
     if request.method == 'POST':
@@ -17,7 +39,7 @@ def upload_view(request):
             container_type = form.cleaned_data['container_type']
             container_sizes = form.cleaned_data['container_size']
             selected_dimensions_ids = form.cleaned_data.get('selected_dimensions', '')
-            include_cost = form.cleaned_data['include_cost']
+            # include_cost = form.cleaned_data['include_cost']
 
             try:
                 # Determine categorytypeid based on container type
@@ -198,6 +220,9 @@ def upload_view(request):
                 total_max_weight = sum(float(c.maxpayload_kg) / 1000 for c in available_containers if c.maxpayload_kg)
                 total_volume = sum(float(c.volume_cbm) for c in available_containers if c.volume_cbm)
 
+                # Store scenarios in session for download (serialize to avoid JSON issues)
+                request.session['scenarios'] = make_serializable(scenarios)
+
                 context = {
                     'scenarios': scenarios,
                     'selected_container': selected_containers_str,
@@ -228,3 +253,101 @@ def get_container_sizes(request, categorytypeid):
     containers = Containertypes.objects.filter(categorytypeid=categorytypeid)
     sizes = [f"{c.name} - {c.size}" for c in containers]
     return JsonResponse({'sizes': sizes})
+
+
+def download_plan(request, format_type):
+    scenarios = request.session.get('scenarios')
+    if not scenarios:
+        return HttpResponse("No data available for download.", status=404)
+
+    scenario = scenarios[0]  # Assuming first scenario
+
+    if format_type == 'excel':
+        wb = Workbook()
+        ws_summary = wb.active
+        ws_summary.title = "Summary"
+        ws_summary.append(["Container", "Total Weight (tons)", "Total Volume (CBM)", "Total Items"])
+
+        for container in scenario['containers_used']:
+            ws_summary.append([
+                f"{container['container']['name']} - {container['container']['size']} (Instance {container['container_number']})",
+                container['total_weight'],
+                container['total_volume'],
+                len(container['items'])
+            ])
+
+            ws = wb.create_sheet(title=f"Container {container['container_number']}")
+            ws.append(["Order", "Query ID", "ID", "Package Type", "Cargo Type", "Dimensions (L×W×H CM)", "Weight (tons)", "Volume (CBM)"])
+            for idx, item in enumerate(container['items'], 1):
+                ws.append([
+                    idx,
+                    item['queryid'],
+                    item['id'],
+                    item['PackageType'],
+                    item['CargoType'],
+                    f"{item['Lenght']} × {item['Breadth']} × {item['Height']}",
+                    item['weight_tons'],
+                    item['volume_cbm']
+                ])
+
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        response = HttpResponse(buffer.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename=optimization_plan.xlsx'
+        return response
+
+    elif format_type == 'pdf':
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        elements = []
+        styles = getSampleStyleSheet()
+
+        elements.append(Paragraph("Optimization Plan", styles['Title']))
+
+        for container in scenario['containers_used']:
+            elements.append(Paragraph(f"Container: {container['container']['name']} - {container['container']['size']} (Instance {container['container_number']})", styles['Heading2']))
+            data = [["Order", "Query ID", "ID", "Package Type", "Cargo Type", "Dimensions", "Weight (tons)", "Volume (CBM)"]]
+            for idx, item in enumerate(container['items'], 1):
+                data.append([
+                    str(idx),
+                    str(item['queryid']),
+                    str(item['id']),
+                    item['PackageType'],
+                    item['CargoType'],
+                    f"{item['Lenght']} × {item['Breadth']} × {item['Height']} CM",
+                    f"{item['weight_tons']:.4f}",
+                    f"{item['volume_cbm']:.4f}"
+                ])
+            table = Table(data)
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), '#f0f0f0'),
+                ('TEXTCOLOR', (0, 0), (-1, 0), '#000000'),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), '#ffffff'),
+                ('GRID', (0, 0), (-1, -1), 1, '#000000'),
+            ]))
+            elements.append(table)
+            elements.append(Paragraph("", styles['Normal']))
+
+        doc.build(elements)
+        buffer.seek(0)
+        response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename=optimization_plan.pdf'
+        return response
+
+    elif format_type == '3d':
+        buffer = BytesIO()
+        with zipfile.ZipFile(buffer, 'w') as zip_file:
+            for image in scenario['model_images']:
+                file_path = os.path.join('optimization/static', image)
+                if os.path.exists(file_path):
+                    zip_file.write(file_path, os.path.basename(file_path))
+        buffer.seek(0)
+        response = HttpResponse(buffer.getvalue(), content_type='application/zip')
+        response['Content-Disposition'] = 'attachment; filename=3d_models.zip'
+        return response
+
+    return HttpResponse("Invalid format.", status=400)

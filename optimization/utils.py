@@ -16,8 +16,10 @@ colors = [
     '#79725c', '#ff9d00', 'rgba(124, 96, 93, 1)', '#7a2900', '#854242', '#815959', '#f14a4a', '#5a5a5a', '#381010', '#520000'
 ]
 
-min_weight_ratio=0.9
-min_volume_ratio=0.9
+min_weight_ratio=0.99
+min_volume_ratio=0.99
+grid_size = 0.1 # 10 cm grid for speed
+
 
 
 def optimize_for_container(container_params, remaining_data, min_weight_ratio, min_volume_ratio):
@@ -352,7 +354,6 @@ def create_3d_model(container_length, container_breadth, container_height, conta
     items.sort(key=sort_key)
 
     # Initialize height map for stacking
-    grid_size = 0.1  # 10 cm grid for speed
     num_x = int(container_length / grid_size) + 1
     num_y = int(container_breadth / grid_size) + 1
     height_map = [[0.0 for _ in range(num_y)] for _ in range(num_x)]
