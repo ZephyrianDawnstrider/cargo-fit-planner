@@ -3,7 +3,9 @@ import io
 
 from django.test import SimpleTestCase
 from django.urls import reverse
+from unittest.mock import patch
 
+from . import mvp_views
 from .packing import DEMO_CSV
 
 
@@ -128,3 +130,19 @@ class CargoMvpViewTests(SimpleTestCase):
     def test_export_rejects_invalid_source(self):
         response = self.client.post(reverse("export-json"), {"cargo_csv": ""})
         self.assertEqual(response.status_code, 400)
+
+    def test_oversized_csv_is_rejected_before_parser(self):
+        source = "x" * (mvp_views.MAX_CSV_BYTES + 1)
+        with patch.object(mvp_views, "parse_csv", side_effect=AssertionError("parser should not run")):
+            response = self.client.post(reverse("upload"), {"cargo_csv": source})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "CSV is too large")
+
+    def test_compute_slot_returns_retryable_busy_response(self):
+        self.assertTrue(mvp_views._COMPUTE_SLOT.acquire(blocking=False))
+        try:
+            response = self.client.post(reverse("upload"), {"cargo_csv": DEMO_CSV})
+        finally:
+            mvp_views._COMPUTE_SLOT.release()
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response["Retry-After"], "2")

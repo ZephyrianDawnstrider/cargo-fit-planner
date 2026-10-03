@@ -31,3 +31,26 @@ python manage.py test optimization.test_mvp_views optimization.test_packing --se
 This branch is a local review candidate. No live service deployment or database connection is part of the demo.
 
 The included browser smoke script exercises multi-row validation, synthetic CSV loading, placement and remaining-item details, SVG/table ID parity, keyboard-operable row-to-box selection, view-angle redraw, CSV and JSON downloads, and snapshot consistency after editing the input. It also checks 375 px layout for document-level horizontal overflow and writes desktop and mobile screenshots. It needs a local Playwright package and Chrome; provide an absolute desktop screenshot path, for example `node scripts/browser-smoke.cjs C:\\temp\\cargo-fit-planner-desktop.png`.
+
+## Render deployment path
+
+`render.yaml` describes exactly one native Python web service on the Free plan, with automatic deploys disabled, no database, disk, worker, cron job, cache service, or other managed resource. It targets the confirmed Render workspace and remains separate from all existing services. A Free plan label is not a hard spending cap; public requests and outbound transfer can still have billing implications. The service should only run while the account remains under the explicitly confirmed free-only constraints and without paid upgrades or attached billing methods.
+
+The Render build checkout contains the Git repository, but `scripts/build_render_runtime.py` stages an explicit allowlist into `.render-runtime`; the running process changes into that directory and sets `PYTHONPATH` to that directory only. The staged runtime contains only dedicated Render settings/URL/WSGI entry points, the stateless packer and view, one template, and no database, legacy settings, routers, models, logs, history, caches, or unrelated files. The tracked SQLite database is not opened, copied into the runtime bundle, or served. Production settings have no installed apps or session middleware and use Django's deny-all dummy database backend. The `healthCheckPath` is `/healthz` and only returns a fixed `ok` response.
+
+The isolated service requires `SECRET_KEY` (at least 50 characters) and Render's canonical `RENDER_EXTERNAL_HOSTNAME` (`*.onrender.com`); it fails closed when either is absent or invalid. `DEBUG` is false, host and CSRF origin are exact, HTTPS redirects and secure CSRF cookies are enabled, and logs go to stdout with query strings omitted. It runs one Gunicorn gthread worker with two threads, an eight-connection accept backlog, bounded request headers, and worker recycling. Compute requests have a process-wide burst of four and refill at one per ten seconds; one compute/export can run at a time, with concurrent work rejected using `503` and `Retry-After`. A raw request-body cap is 800 KiB to allow worst-case percent-encoding expansion; decoded CSV itself is capped at 256 KiB. Each pack expands at most 100 units and makes at most 100,000 global coordinate-candidate checks, retaining the prior 2,000-check per-orientation heuristic limit. This bounds deterministic work but does not promise a per-request deadline or availability under public traffic; rate state resets when the process restarts and public response traffic is not a zero-cost guarantee.
+
+Render Free services can sleep when idle and use ephemeral storage. The application writes no user data to disk and stores no session/history, but cold starts and service availability still require live verification after an authorized deployment. No deployment, public health check, hosted browser walkthrough, billing setting, or account-level spend cap has been verified in this local readiness pass.
+
+Local readiness checks (PowerShell; set the two synthetic environment values before running the production settings check):
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = '1'
+$env:SECRET_KEY = 'local-test-secret-value-at-least-50-characters-long-000000'
+$env:RENDER_EXTERNAL_HOSTNAME = 'cargo-fit-planner.onrender.com'
+python manage.py check --settings=dcd_project.settings_render
+python manage.py test optimization.test_render_deploy --settings=dcd_project.settings_demo
+python manage.py test optimization.test_mvp_views optimization.test_packing --settings=dcd_project.settings_demo
+```
+
+`render.yaml` and the allowlist builder are the reproducible native-Python Blueprint path. They do not configure persistent storage or invoke deployment themselves. See the current readiness evidence in `docs/evidence/render-free-readiness-2026-10-03.md`.

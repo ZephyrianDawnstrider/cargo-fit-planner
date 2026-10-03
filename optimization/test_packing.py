@@ -2,6 +2,7 @@
 
 import json
 import unittest
+from unittest.mock import patch
 
 from optimization.packing import CsvValidationError, DEMO_CSV, pack_items, parse_csv
 
@@ -211,6 +212,37 @@ class PackingTests(unittest.TestCase):
         with self.assertRaises(CsvValidationError) as caught:
             parse_csv("\ud800")
         self.assertEqual(caught.exception.errors[0]["field"], "csv")
+
+    def test_csv_bounds_user_controlled_labels(self):
+        header = "item_id,name,length_mm,width_mm,height_mm,weight_kg,quantity,stackable,orientation"
+        for field, value in (("item_id", "X" * 65), ("name", "N" * 121)):
+            row = {"item_id": "a", "name": "A", "length_mm": "10", "width_mm": "10", "height_mm": "10", "weight_kg": "1", "quantity": "1", "stackable": "true", "orientation": "fixed"}
+            row[field] = value
+            with self.subTest(field=field), self.assertRaises(CsvValidationError) as caught:
+                parse_csv(header + "\n" + ",".join(row[key] for key in header.split(",")) + "\n")
+            self.assertTrue(any(error["field"] == field for error in caught.exception.errors))
+
+    def test_candidate_budget_is_global_and_reports_remaining_units(self):
+        rows = parse_csv(DEMO_CSV)
+        with patch("optimization.packing.MAX_CANDIDATE_CHECKS_PER_PACK", 1):
+            result = pack_items(rows)
+        self.assertEqual(result["totals"]["input_count"], 5)
+        self.assertEqual(result["totals"]["placed_count"] + result["totals"]["unplaced_count"], 5)
+        self.assertEqual(result["placed"][0]["item_id"], "CRATE-001")
+        self.assertTrue(all(item["reason"] == "search_budget_exhausted" for item in result["unplaced"]))
+
+    def test_dimension_reason_survives_budget_exhaustion(self):
+        with patch("optimization.packing.MAX_CANDIDATE_CHECKS_PER_PACK", 0):
+            result = pack_items([item("too-long", length=6000), item("fits")])
+        reasons = {entry["item_id"]: entry["reason"] for entry in result["unplaced"]}
+        self.assertEqual(reasons["too-long"], "door_or_container_dimensions")
+        self.assertEqual(reasons["fits"], "search_budget_exhausted")
+
+    def test_previous_per_orientation_candidate_bound_is_preserved(self):
+        with patch("optimization.packing.MAX_CANDIDATE_CHECKS_PER_ORIENTATION", 1):
+            result = pack_items([item("a"), item("b")])
+        self.assertEqual(result["totals"]["placed_count"], 1)
+        self.assertEqual(result["unplaced"][0]["reason"], "no_feasible_space_found_by_heuristic")
 
 
 if __name__ == "__main__":

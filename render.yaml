@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: cargo-fit-planner
+    runtime: python
+    plan: free
+    branch: main
+    autoDeployTrigger: 'off'
+    buildCommand: python scripts/build_render_runtime.py .render-runtime && python -m pip install --no-cache-dir -r requirements-render.txt
+    startCommand: cd .render-runtime && PYTHONPATH=. exec python -m gunicorn dcd_project.wsgi_render:application --bind 0.0.0.0:$PORT --worker-class gthread --workers 1 --threads 2 --worker-connections 16 --backlog 8 --timeout 20 --graceful-timeout 10 --max-requests 100 --max-requests-jitter 10 --limit-request-line 4094 --limit-request-fields 40 --limit-request-field_size 4096 --access-logfile - --access-logformat '%(h)s %(m)s %(U)s %(s)s %(B)s' --error-logfile -
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14.3
+      - key: PYTHONDONTWRITEBYTECODE
+        value: '1'
+      - key: PYTHONUNBUFFERED
+        value: '1'
+      - key: DJANGO_SETTINGS_MODULE
+        value: dcd_project.settings_render
+      - key: SECRET_KEY
+        sync: false

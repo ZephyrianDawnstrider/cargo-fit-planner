@@ -3,16 +3,19 @@
 import csv
 import io
 import json
+import threading
 from decimal import Decimal
 
 from django.http import HttpResponse
 from django.shortcuts import render
-from django.views.decorators.http import require_POST
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from .packing import CSV_TEMPLATE, DEMO_CSV, CsvValidationError, pack_items, parse_csv
 
 
 MAX_CSV_BYTES = 256 * 1024
+_COMPUTE_SLOT = threading.BoundedSemaphore(1)
 
 
 def _weight_sum(items):
@@ -25,7 +28,7 @@ def _format_kg(value):
 
 
 def _pack_source(source):
-    if len(source.encode("utf-8")) > MAX_CSV_BYTES:
+    if _source_too_large(source):
         raise ValueError("CSV is too large. Keep uploads under 256 KiB.")
     return pack_items(parse_csv(source))
 
@@ -40,14 +43,18 @@ def _safe_csv_row(row):
     return safe
 
 
+@require_http_methods(["GET", "POST"])
+@never_cache
 def index(request):
     context = {"csv_template": CSV_TEMPLATE, "demo_csv": DEMO_CSV}
     if request.method == "POST":
-        source = request.POST.get("cargo_csv", "")
+        if not _COMPUTE_SLOT.acquire(blocking=False):
+            return _busy_response()
         try:
-            items = parse_csv(source)
-            if len(source.encode("utf-8")) > MAX_CSV_BYTES:
+            source = request.POST.get("cargo_csv", "")
+            if _source_too_large(source):
                 raise ValueError("CSV is too large. Keep uploads under 256 KiB.")
+            items = parse_csv(source)
             result = pack_items(items)
         except CsvValidationError as exc:
             context.update({
@@ -73,45 +80,79 @@ def index(request):
                 "payload_utilization_pct": result["totals"]["placed_weight_kg"] / result["container"]["max_payload_kg"] * 100,
                 "volume_utilization_pct": result["totals"]["placed_volume_m3"] / container_volume * 100,
             })
-    return render(request, "optimization/mvp.html", context)
+        finally:
+            _COMPUTE_SLOT.release()
+    response = render(request, "optimization/mvp.html", context)
+    if request.method == "POST":
+        response["Cache-Control"] = "no-store"
+    return response
 
 
 @require_POST
+@never_cache
 def export_csv(request):
+    if not _COMPUTE_SLOT.acquire(blocking=False):
+        return _busy_response()
     try:
         result = _pack_source(request.POST.get("cargo_csv", ""))
+        output = io.StringIO(newline="")
+        fields = [
+            "item_id", "source_item_id", "name", "status", "reason",
+            "x", "y", "z", "dx", "dy", "dz",
+            "length_mm", "width_mm", "height_mm", "weight_kg", "stackable",
+            "orientation", "rotation_deg",
+        ]
+        writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
+        writer.writeheader()
+        for item in result.get("placed", []):
+            writer.writerow(_safe_csv_row({**item, "status": "placed"}))
+        for item in result.get("unplaced", []):
+            writer.writerow(_safe_csv_row({**item, "status": "unplaced"}))
+        response = HttpResponse(output.getvalue(), content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="cargo-packing.csv"'
+        return response
     except (ValueError, TypeError, UnicodeError) as exc:
         return HttpResponse(str(exc), status=400, content_type="text/plain; charset=utf-8")
-    output = io.StringIO(newline="")
-    fields = [
-        "item_id", "source_item_id", "name", "status", "reason",
-        "x", "y", "z", "dx", "dy", "dz",
-        "length_mm", "width_mm", "height_mm", "weight_kg", "stackable",
-        "orientation", "rotation_deg",
-    ]
-    writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
-    writer.writeheader()
-    for item in result.get("placed", []):
-        writer.writerow(_safe_csv_row({**item, "status": "placed"}))
-    for item in result.get("unplaced", []):
-        writer.writerow(_safe_csv_row({**item, "status": "unplaced"}))
-    response = HttpResponse(output.getvalue(), content_type="text/csv; charset=utf-8")
-    response["Content-Disposition"] = 'attachment; filename="cargo-packing.csv"'
-    return response
+    finally:
+        _COMPUTE_SLOT.release()
 
 
 @require_POST
+@never_cache
 def export_json(request):
+    if not _COMPUTE_SLOT.acquire(blocking=False):
+        return _busy_response()
     try:
         result = _pack_source(request.POST.get("cargo_csv", ""))
+        response = HttpResponse(json.dumps(result, indent=2), content_type="application/json; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="cargo-packing.json"'
+        return response
     except (ValueError, TypeError, UnicodeError) as exc:
         return HttpResponse(str(exc), status=400, content_type="text/plain; charset=utf-8")
-    response = HttpResponse(json.dumps(result, indent=2), content_type="application/json; charset=utf-8")
-    response["Content-Disposition"] = 'attachment; filename="cargo-packing.json"'
+    finally:
+        _COMPUTE_SLOT.release()
+
+
+def _source_too_large(source):
+    try:
+        return len(source.encode("utf-8")) > MAX_CSV_BYTES
+    except UnicodeEncodeError:
+        return False  # parse_csv returns the safe structured Unicode validation error.
+
+
+def _busy_response():
+    response = HttpResponse("A packing request is already being processed. Retry shortly.", status=503, content_type="text/plain; charset=utf-8")
+    response["Retry-After"] = "2"
     return response
 
 
+@require_GET
 def demo_csv(request):
     response = HttpResponse(CSV_TEMPLATE, content_type="text/csv; charset=utf-8")
     response["Content-Disposition"] = 'attachment; filename="cargo-template.csv"'
     return response
+
+
+@require_GET
+def healthz(request):
+    return HttpResponse("ok\n", content_type="text/plain; charset=utf-8")

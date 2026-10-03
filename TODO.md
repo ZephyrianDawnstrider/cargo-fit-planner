@@ -23,3 +23,11 @@ The follow-up UI scope adds structured row-level CSV errors, actionable remainin
 ## 2026-10-03 — Cargo Fit Planner refinement acceptance
 
 The refinement is verified: 28 focused tests pass, Django reports no system check issues, and the headless browser walkthrough passes at desktop and 375 px without document overflow or console errors. The evidence record above documents the validation, tables, summaries, selection interaction, exports, and screenshots. Local delivery identity and remote URL are documented after repository rename in the delivery receipt; earlier status sections remain historical.
+
+## 2026-10-03 — Render Free readiness candidate (cloud hold)
+
+An isolated, stateless Render Docker/Blueprint candidate is being prepared with fail-closed production settings, a health endpoint, bounded inputs and compute admission, and an image/build-context allowlist. This does not authorize or record cloud resource creation. Zero-cost/billing safeguards remain unresolved; hosted health/browser behavior, account secrets, and public service availability are not proven. See `docs/evidence/render-free-readiness-2026-10-03.md` for current checks and blockers; all earlier TODO and acceptance notes remain historical.
+
+## 2026-10-03 — Native Python service path supersedes draft
+
+After manager confirmation that the selected Render workspace has no payment card attached and the human authorized a Free-only service, the deployment path is a native Python web service, not the unbuildable local Docker path. The source bundle is staged from an explicit allowlist; readiness and account/service creation evidence are appended to `docs/evidence/render-free-readiness-2026-10-03.md`. The earlier cloud-hold note records the state before this authorization and is preserved as historical.

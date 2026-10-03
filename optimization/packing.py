@@ -38,6 +38,10 @@ MAX_ROWS = 100
 MAX_UNITS = 100
 MAX_ITEMS = 100
 MAX_CSV_ERRORS = 20
+MAX_ITEM_ID_CHARS = 64
+MAX_ITEM_NAME_CHARS = 120
+MAX_CANDIDATE_CHECKS_PER_PACK = 100_000
+MAX_CANDIDATE_CHECKS_PER_ORIENTATION = 2_000
 
 CONTAINER = {
     "name": "20 ft standard (Hapag-Lloyd example)",
@@ -142,12 +146,16 @@ def parse_csv(text: str) -> list[dict[str, Any]]:
             name = (row.get("name") or "").strip()
             if not source_id:
                 add_error(row_number, "item_id", "required value is blank")
+            elif len(source_id) > MAX_ITEM_ID_CHARS:
+                add_error(row_number, "item_id", f"must be at most {MAX_ITEM_ID_CHARS} characters")
             elif source_id in seen_ids:
                 add_error(row_number, "item_id", f"duplicate value {source_id!r}")
             else:
                 seen_ids.add(source_id)
             if not name:
                 add_error(row_number, "name", "required value is blank")
+            elif len(name) > MAX_ITEM_NAME_CHARS:
+                add_error(row_number, "name", f"must be at most {MAX_ITEM_NAME_CHARS} characters")
             for field in CSV_HEADERS[2:]:
                 if field not in row or row[field] is None or not row[field].strip():
                     add_error(row_number, field, "required value is blank")
@@ -290,10 +298,22 @@ def _orientations(item: dict[str, Any]) -> list[tuple[float, float, str]]:
     return [fixed]
 
 
-def _candidate(item: dict[str, Any], placed: list[dict[str, Any]]) -> dict[str, Any] | None:
+def _fits_door_and_container(item: dict[str, Any]) -> bool:
+    return any(
+        orientation[1] <= CONTAINER["door_mm"]["width"]
+        and item["height_mm"] <= CONTAINER["door_mm"]["height"]
+        and orientation[0] <= CONTAINER["inside_mm"]["length"]
+        and orientation[1] <= CONTAINER["inside_mm"]["width"]
+        and item["height_mm"] <= CONTAINER["inside_mm"]["height"]
+        for orientation in _orientations(item)
+    )
+
+
+def _candidate(item: dict[str, Any], placed: list[dict[str, Any]], budget: list[int]) -> tuple[dict[str, Any] | None, bool]:
     inner = CONTAINER["inside_mm"]
     door = CONTAINER["door_mm"]
     for dx, dy, direction in _orientations(item):
+        examined = 0
         dz = item["height_mm"]
         # Every cargo orientation travels upright and straight through the door.
         if dy > door["width"] or dz > door["height"]:
@@ -301,7 +321,6 @@ def _candidate(item: dict[str, Any], placed: list[dict[str, Any]]) -> dict[str, 
         if dx > inner["length"] or dy > inner["width"] or dz > inner["height"]:
             continue
         supports = [None] + [p for p in placed if p["stackable"]]
-        examined = 0
         for support in supports:
             z = 0.0 if support is None else support["z"] + support["dz"]
             if z + dz > inner["height"]:
@@ -321,9 +340,12 @@ def _candidate(item: dict[str, Any], placed: list[dict[str, Any]]) -> dict[str, 
                 ys.add(support["y"])
             for x in sorted(xs):
                 for y in sorted(ys):
+                    if budget[0] <= 0:
+                        return None, True
+                    budget[0] -= 1
                     examined += 1
-                    if examined > 2_000:
-                        return None
+                    if examined > MAX_CANDIDATE_CHECKS_PER_ORIENTATION:
+                        return None, False
                     if x + dx > inner["length"] or y + dy > inner["width"]:
                         continue
                     if support is not None and not (
@@ -334,8 +356,8 @@ def _candidate(item: dict[str, Any], placed: list[dict[str, Any]]) -> dict[str, 
                     position = {"x": x, "y": y, "z": z, "dx": dx, "dy": dy, "dz": dz}
                     if any(_overlap(position, p) for p in placed):
                         continue
-                    return {**position, "orientation": direction}
-    return None
+                    return {**position, "orientation": direction}, False
+    return None, False
 
 
 def pack_items(items: Iterable[dict[str, Any]]) -> dict[str, Any]:
@@ -348,6 +370,8 @@ def pack_items(items: Iterable[dict[str, Any]]) -> dict[str, Any]:
     placed: list[dict[str, Any]] = []
     unplaced: list[dict[str, Any]] = []
     payload_grams = 0
+    candidate_budget = [MAX_CANDIDATE_CHECKS_PER_PACK]
+    search_exhausted = False
     for item in normalized:
         # Reject an overweight item before converting kg to integer grams;
         # very large but finite values can overflow Python's float-to-int path.
@@ -358,17 +382,19 @@ def pack_items(items: Iterable[dict[str, Any]]) -> dict[str, Any]:
         if payload_grams + item_grams > CONTAINER["max_payload_kg"] * 1000:
             unplaced.append({**item, "reason": "payload_limit"})
             continue
-        position = _candidate(item, placed)
+        if not _fits_door_and_container(item):
+            unplaced.append({**item, "reason": "door_or_container_dimensions"})
+            continue
+        if search_exhausted:
+            unplaced.append({**item, "reason": "search_budget_exhausted"})
+            continue
+        position, budget_exhausted = _candidate(item, placed, candidate_budget)
+        if budget_exhausted:
+            search_exhausted = True
+            unplaced.append({**item, "reason": "search_budget_exhausted"})
+            continue
         if position is None:
-            reason = "door_or_container_dimensions" if not any(
-                orientation[1] <= CONTAINER["door_mm"]["width"]
-                and item["height_mm"] <= CONTAINER["door_mm"]["height"]
-                and orientation[0] <= CONTAINER["inside_mm"]["length"]
-                and orientation[1] <= CONTAINER["inside_mm"]["width"]
-                and item["height_mm"] <= CONTAINER["inside_mm"]["height"]
-                for orientation in _orientations(item)
-            ) else "no_feasible_space_found_by_heuristic"
-            unplaced.append({**item, "reason": reason})
+            unplaced.append({**item, "reason": "no_feasible_space_found_by_heuristic"})
             continue
         placed.append({**item, **position, "rotation_deg": 90 if position["orientation"] == "yaw" else 0})
         payload_grams += item_grams
