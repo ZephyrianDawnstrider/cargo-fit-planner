@@ -1,4 +1,7 @@
 logs/django.log
+__pycache__/
+*.py[cod]
+.venv/
 optimization/__pycache__/urls.cpython-311.pyc
 optimization/__pycache__/utils.cpython-311.pyc
 optimization/__pycache__/views.cpython-311.pyc

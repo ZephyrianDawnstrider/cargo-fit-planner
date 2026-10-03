@@ -1,0 +1,3 @@
+item_id,name,length_mm,width_mm,height_mm,weight_kg,quantity,stackable,orientation
+BOX,Sample box,600,400,350,18,4,true,yaw
+CRATE,Heavy crate,900,700,800,220,1,false,fixed

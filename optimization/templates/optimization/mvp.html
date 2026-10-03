@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>Cargo fit planner</title>
+  <style>
+    :root { color-scheme: light; font: 15px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; color: #17202b; background: #f2f5f8; }
+    * { box-sizing: border-box; } body { margin: 0; }
+    header { background: #12283c; color: #f6f9fc; padding: 28px max(24px, calc((100% - 1180px)/2)); }
+    header p { margin: 6px 0 0; color: #bdd0df; } main { max-width: 1180px; margin: 28px auto; padding: 0 20px 42px; }
+    h1 { margin: 0; font-size: 27px; letter-spacing: -.02em; } h2 { font-size: 18px; margin: 0 0 14px; }
+    .panel { background: white; border: 1px solid #dce3e9; border-radius: 12px; padding: 20px; margin: 16px 0; box-shadow: 0 4px 14px #2034480a; }
+    .toolbar, .metrics { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    textarea { width: 100%; min-height: 176px; padding: 12px; border: 1px solid #bdc9d4; border-radius: 8px; font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    button, .button { border: 0; border-radius: 7px; background: #126c84; color: white; padding: 10px 15px; font-weight: 650; text-decoration: none; cursor: pointer; }
+    button.secondary, .button.secondary { color: #18445b; background: #e8f1f5; } .note, small { color: #546473; }
+    .error { color: #8c1c13; background: #fff1ef; border: 1px solid #ffc7c0; border-radius: 8px; padding: 12px; }
+    .metrics { margin: 14px 0; } .metric { min-width: 145px; flex: 1; background: #f4f7f9; border-radius: 8px; padding: 12px; }
+    .metric strong { display: block; font-size: 22px; } .metric span { color: #596b79; font-size: 12px; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(290px, .65fr); gap: 16px; }
+    .scene-wrap { overflow: hidden; min-height: 355px; background: radial-gradient(ellipse at 50% 45%,#fff,#eaf0f4); border-radius: 9px; display: grid; place-items: center; }
+    .scene { width: 100%; height: auto; max-height: 390px; }
+    .floor { fill: #e8eff3; stroke: #657b89; stroke-width: 2; }
+    .box-face { stroke: #254858; stroke-width: 1; stroke-linejoin: round; }
+    .box-label { font: 11px ui-monospace, monospace; fill: #122b36; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+    .axis { font: 12px ui-sans-serif, system-ui; fill: #344b59; font-weight: 700; }
+    .subtle { font-size: 12px; color: #61717e; } .scroll { overflow: auto; max-height: 380px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; } th,td { text-align: left; padding: 8px 9px; border-bottom: 1px solid #e6ebef; white-space: nowrap; } th { background: #f5f8fa; position: sticky; top: 0; }
+    .badge { display: inline-block; border-radius: 99px; padding: 2px 8px; font-size: 11px; font-weight: 700; } .placed { color: #155b3c; background: #e3f5eb; } .unplaced { color: #8b4410; background: #fff0db; }
+    .limitations { color: #566572; font-size: 13px; } .limitations li { margin: 4px 0; }
+    @media(max-width:800px) { .layout { grid-template-columns: 1fr; } header { padding: 24px; } main { margin-top: 16px; } }
+  </style>
+</head>
+<body>
+<header><h1>Cargo fit planner</h1><p>Deterministic single-container placement preview · dimensions in millimetres · weights in kilograms</p></header>
+<main>
+  <section class="panel">
+    <h2>1. Add cargo</h2>
+    <p class="note">CSV is limited to 256 KiB, 100 source rows, and 100 expanded items. Dimensions use whole millimetres; weights use kilograms to 0.001 kg. After packing, exports match the displayed result; repack after making edits. Cost estimates are not included.</p>
+    <div class="toolbar"><a class="button secondary" href="{% url 'cargo-template' %}">Download CSV template</a><button class="secondary" type="button" id="load-demo">Load synthetic example</button></div>
+    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+    <form method="post" id="cargo-form">{% csrf_token %}
+      <label for="cargo-csv"><strong>Cargo CSV</strong></label>
+      <p><input id="csv-file" type="file" accept=".csv,text/csv" aria-label="Choose a CSV file to load"></p>
+      <textarea id="cargo-csv" name="cargo_csv" spellcheck="false" required>{{ cargo_csv|default:'' }}</textarea>
+      <div class="toolbar" style="margin-top:12px"><button type="submit">Pack cargo</button><span class="subtle">Supported orientation: fixed or yaw rotation. A box can support cargo above it only when its stackable flag is true.</span></div>
+    </form>
+  </section>
+  {{ demo_csv|json_script:"demo-csv" }}
+
+  {% if result %}
+  <section class="panel">
+    <h2>2. Packing result · {{ result.container.name }}</h2>
+    <div class="metrics">
+      <div class="metric"><strong>{{ result.totals.input_count }}</strong><span>input items</span></div>
+      <div class="metric"><strong>{{ result.totals.placed_count }}</strong><span>placed</span></div>
+      <div class="metric"><strong>{{ result.totals.unplaced_count }}</strong><span>remaining</span></div>
+      <div class="metric"><strong>{{ result.totals.placed_weight_kg|floatformat:1 }} kg</strong><span>placed weight</span></div>
+      <div class="metric"><strong>{{ result.totals.placed_volume_m3|floatformat:2 }} m³</strong><span>placed volume</span></div>
+    </div>
+    <p class="note">Container internal dimensions: {{ result.container.inside_mm.length }} × {{ result.container.inside_mm.width }} × {{ result.container.inside_mm.height }} mm · door: {{ result.container.door_mm.width }} × {{ result.container.door_mm.height }} mm · payload limit: {{ result.container.max_payload_kg }} kg · <a href="{{ result.container.source_url }}" target="_blank" rel="noopener">profile source</a> (checked {{ result.container.source_checked }})</p>
+    <div class="toolbar">
+      <form method="post" action="{% url 'export-csv' %}" class="export-form">{% csrf_token %}<input type="hidden" name="cargo_csv" value="{{ cargo_csv|escape }}"><button class="secondary">Export item CSV</button></form>
+      <form method="post" action="{% url 'export-json' %}" class="export-form">{% csrf_token %}<input type="hidden" name="cargo_csv" value="{{ cargo_csv|escape }}"><button class="secondary">Export packing JSON</button></form>
+    </div>
+  </section>
+  <div class="layout">
+    <section class="panel"><h2>3. Isometric loading view</h2><div class="toolbar"><span id="rendered-count" class="subtle"></span><button id="rotate-scene" class="secondary" type="button">Change view angle</button></div><div class="scene-wrap"><svg id="scene" class="scene" viewBox="0 0 760 370" role="img" aria-label="Three-dimensional cargo placement preview"></svg></div><p class="subtle">Rendered from each placed item's x/y/z position and dx/dy/dz size. Labels match the item IDs in the table.</p></section>
+    <section class="panel"><h2>Remaining cargo</h2>
+      {% if result.unplaced %}<div class="scroll"><table><thead><tr><th>Item ID</th><th>Reason</th></tr></thead><tbody>{% for item in result.unplaced %}<tr><td>{{ item.item_id }}</td><td>{{ item.reason }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p>All input items were placed.</p>{% endif %}
+      <h2 style="margin-top:22px">Supported scope</h2><ul class="limitations"><li>One standard 20 ft container profile with verified published dimensions and payload limit.</li><li>Axis-aligned placement; fixed or yaw orientation only.</li><li>Stackability is a simple cargo flag, not a load-bearing strength model.</li><li>No loading sequence, lashing, point-load, or cargo strength calculations.</li></ul>
+    </section>
+  </div>
+  <section class="panel"><h2>Placed item coordinates</h2><div class="scroll"><table><thead><tr><th>Item ID</th><th>Position (x, y, z) mm</th><th>Size (dx, dy, dz) mm</th><th>Weight</th><th>Orientation</th></tr></thead><tbody>{% for item in result.placed %}<tr><td>{{ item.item_id }}</td><td>{{ item.x }}, {{ item.y }}, {{ item.z }}</td><td>{{ item.dx }}, {{ item.dy }}, {{ item.dz }}</td><td>{{ item.weight_kg }} kg</td><td>{{ item.orientation }}</td></tr>{% empty %}<tr><td colspan="5">No cargo placed.</td></tr>{% endfor %}</tbody></table></div></section>
+  {{ result|json_script:"packing-result" }}
+  <script>
+    const packed = JSON.parse(document.getElementById('packing-result').textContent);
+    const scene = document.getElementById('scene');
+    const ns = 'http://www.w3.org/2000/svg';
+    const inner = packed.container.inside_mm, length = inner.length, width = inner.width, height = inner.height;
+    const palette = ['#63c4d1','#f2b84b','#8ebd78','#b294d2','#e7866a','#65a5df'];
+    const shades = (hex) => { const n=parseInt(hex.slice(1),16),r=n>>16,g=n>>8&255,b=n&255; return [`rgb(${Math.round(r*.82)},${Math.round(g*.82)},${Math.round(b*.82)})`,`rgb(${Math.round(r*.68)},${Math.round(g*.68)},${Math.round(b*.68)})`]; };
+    function draw(angle) {
+      scene.replaceChildren();
+      const [vw,vh]=[760,370], theta=angle*Math.PI/180, c=Math.cos(theta), s=Math.sin(theta);
+      const scale=Math.min((vw-100)/((length+width)*c),(vh-64)/((length+width)*s+height));
+      const ox=vw/2-scale*(length-width)*c/2, oy=24+scale*height;
+      const pt=(x,y,z)=>[ox+scale*(x-y)*c,oy+scale*((x+y)*s-z)];
+      const polygon=(points,cls,fill,id)=>{const el=document.createElementNS(ns,'polygon');el.setAttribute('points',points.map(p=>pt(...p).join(',')).join(' '));el.setAttribute('class',cls);el.setAttribute('fill',fill);if(id){el.setAttribute('data-item-id',id);const title=document.createElementNS(ns,'title');title.textContent=id;el.appendChild(title);}scene.appendChild(el);};
+      polygon([[0,0,0],[length,0,0],[length,width,0],[0,width,0]],'floor','#e8eff3');
+      const faces=[], labels=[];
+      const addFace=(points,fill,item_id)=>{const center=points.reduce((acc,p)=>[acc[0]+p[0]/points.length,acc[1]+p[1]/points.length,acc[2]+p[2]/points.length],[0,0,0]);faces.push({points,fill,item_id,depth:center[0]+center[1]+2*s*center[2]});};
+      packed.placed.forEach((item,index)=>{
+        const {x,y,z,dx,dy,dz,item_id}=item, top=[[x,y,z+dz],[x+dx,y,z+dz],[x+dx,y+dy,z+dz],[x,y+dy,z+dz]];
+        const [sideX,sideY]=shades(palette[index%palette.length]);
+        addFace(top,palette[index%palette.length],item_id);
+        addFace([[x+dx,y,z],[x+dx,y,z+dz],[x+dx,y+dy,z+dz],[x+dx,y+dy,z]],sideX,item_id);
+        addFace([[x,y+dy,z],[x,y+dy,z+dz],[x+dx,y+dy,z+dz],[x+dx,y+dy,z]],sideY,item_id);
+        const center=pt(x+dx/2,y+dy/2,z+dz),label=document.createElementNS(ns,'text');label.setAttribute('x',center[0]);label.setAttribute('y',center[1]);label.setAttribute('class','box-label');label.textContent=item_id;labels.push(label);
+      });
+      faces.sort((a,b)=>a.depth-b.depth).forEach(face=>polygon(face.points,'box-face',face.fill,face.item_id));
+      labels.forEach(label=>scene.appendChild(label));
+      const start=pt(0,0,0); [[length,0,0,'X'],[0,width,0,'Y'],[0,0,height,'Z']].forEach(([x,y,z,name])=>{const end=pt(x,y,z),line=document.createElementNS(ns,'line');line.setAttribute('x1',start[0]);line.setAttribute('y1',start[1]);line.setAttribute('x2',end[0]);line.setAttribute('y2',end[1]);line.setAttribute('stroke','#314b59');line.setAttribute('stroke-width','2');scene.appendChild(line);const label=document.createElementNS(ns,'text');label.setAttribute('x',end[0]+5);label.setAttribute('y',end[1]-4);label.setAttribute('class','axis');label.textContent=name;scene.appendChild(label);});
+    }
+    draw(30);
+    const renderedIds=new Set([...scene.querySelectorAll('.box-face[data-item-id]')].map(face=>face.getAttribute('data-item-id')));
+    document.getElementById('rendered-count').textContent = `${renderedIds.size} rendered boxes · ${packed.placed.length} placed items`;
+    let rotation=30; document.getElementById('rotate-scene').addEventListener('click',()=>{rotation=rotation===30?42:30;draw(rotation);});
+  </script>
+  {% endif %}
+</main>
+<script>
+  document.getElementById('load-demo').addEventListener('click', () => { document.getElementById('cargo-csv').value = JSON.parse(document.getElementById('demo-csv').textContent); });
+  document.getElementById('csv-file').addEventListener('change', async (event) => {
+    const file = event.target.files[0]; if (!file) return;
+    if (file.size > 262144) { alert('CSV files must be under 256 KiB.'); event.target.value = ''; return; }
+    document.getElementById('cargo-csv').value = await file.text();
+  });
+</script>
+</body>
+</html>
