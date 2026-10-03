@@ -3,15 +3,25 @@
 import csv
 import io
 import json
+from decimal import Decimal
 
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_POST
 
-from .packing import CSV_TEMPLATE, DEMO_CSV, pack_items, parse_csv
+from .packing import CSV_TEMPLATE, DEMO_CSV, CsvValidationError, pack_items, parse_csv
 
 
 MAX_CSV_BYTES = 256 * 1024
+
+
+def _weight_sum(items):
+    return sum((Decimal(str(item["weight_kg"])) for item in items), Decimal("0"))
+
+
+def _format_kg(value):
+    amount = Decimal(str(value))
+    return f"{amount:.3E}" if amount.adjusted() >= 9 else f"{amount:.3f}"
 
 
 def _pack_source(source):
@@ -39,10 +49,30 @@ def index(request):
             if len(source.encode("utf-8")) > MAX_CSV_BYTES:
                 raise ValueError("CSV is too large. Keep uploads under 256 KiB.")
             result = pack_items(items)
+        except CsvValidationError as exc:
+            context.update({
+                "cargo_csv": source,
+                "validation_errors": exc.errors,
+                "validation_errors_truncated": exc.truncated,
+            })
         except (ValueError, TypeError) as exc:
             context.update({"cargo_csv": source, "error": str(exc)})
         else:
-            context.update({"cargo_csv": source, "items": items, "result": result})
+            inside = result["container"]["inside_mm"]
+            container_volume = inside["length"] * inside["width"] * inside["height"] / 1_000_000_000
+            context.update({
+                "cargo_csv": source,
+                "items": items,
+                "result": result,
+                "placed_rows": [{**item, "weight_display": _format_kg(item["weight_kg"])} for item in result["placed"]],
+                "unplaced_rows": [{**item, "weight_display": _format_kg(item["weight_kg"])} for item in result["unplaced"]],
+                "source_row_count": len({item["source_item_id"] for item in items}),
+                "input_weight_display": _format_kg(_weight_sum(items)),
+                "placed_weight_display": _format_kg(result["totals"]["placed_weight_kg"]),
+                "remaining_weight_display": _format_kg(_weight_sum(result["unplaced"])),
+                "payload_utilization_pct": result["totals"]["placed_weight_kg"] / result["container"]["max_payload_kg"] * 100,
+                "volume_utilization_pct": result["totals"]["placed_volume_m3"] / container_volume * 100,
+            })
     return render(request, "optimization/mvp.html", context)
 
 
@@ -53,7 +83,12 @@ def export_csv(request):
     except (ValueError, TypeError, UnicodeError) as exc:
         return HttpResponse(str(exc), status=400, content_type="text/plain; charset=utf-8")
     output = io.StringIO(newline="")
-    fields = ["item_id", "status", "reason", "x", "y", "z", "dx", "dy", "dz", "weight_kg", "orientation"]
+    fields = [
+        "item_id", "source_item_id", "name", "status", "reason",
+        "x", "y", "z", "dx", "dy", "dz",
+        "length_mm", "width_mm", "height_mm", "weight_kg", "stackable",
+        "orientation", "rotation_deg",
+    ]
     writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
     writer.writeheader()
     for item in result.get("placed", []):

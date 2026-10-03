@@ -4,19 +4,23 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="data:,">
-  <title>Cargo fit planner</title>
+  <title>Cargo Fit Planner</title>
   <style>
     :root { color-scheme: light; font: 15px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; color: #17202b; background: #f2f5f8; }
     * { box-sizing: border-box; } body { margin: 0; }
     header { background: #12283c; color: #f6f9fc; padding: 28px max(24px, calc((100% - 1180px)/2)); }
     header p { margin: 6px 0 0; color: #bdd0df; } main { max-width: 1180px; margin: 28px auto; padding: 0 20px 42px; }
     h1 { margin: 0; font-size: 27px; letter-spacing: -.02em; } h2 { font-size: 18px; margin: 0 0 14px; }
-    .panel { background: white; border: 1px solid #dce3e9; border-radius: 12px; padding: 20px; margin: 16px 0; box-shadow: 0 4px 14px #2034480a; }
+    .panel { min-width: 0; background: white; border: 1px solid #dce3e9; border-radius: 12px; padding: 20px; margin: 16px 0; box-shadow: 0 4px 14px #2034480a; }
     .toolbar, .metrics { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
     textarea { width: 100%; min-height: 176px; padding: 12px; border: 1px solid #bdc9d4; border-radius: 8px; font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
     button, .button { border: 0; border-radius: 7px; background: #126c84; color: white; padding: 10px 15px; font-weight: 650; text-decoration: none; cursor: pointer; }
     button.secondary, .button.secondary { color: #18445b; background: #e8f1f5; } .note, small { color: #546473; }
     .error { color: #8c1c13; background: #fff1ef; border: 1px solid #ffc7c0; border-radius: 8px; padding: 12px; }
+    .error h3 { margin: 0 0 6px; font-size: 15px; } .error ul { margin: 4px 0 0; padding-left: 22px; }
+    .box-face.is-highlighted { stroke: #b11d45; stroke-width: 4; }
+    .cargo-row.is-highlighted { background: #fff5d9; }
+    :focus-visible { outline: 3px solid #d27600; outline-offset: 2px; }
     .metrics { margin: 14px 0; } .metric { min-width: 145px; flex: 1; background: #f4f7f9; border-radius: 8px; padding: 12px; }
     .metric strong { display: block; font-size: 22px; } .metric span { color: #596b79; font-size: 12px; }
     .layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(290px, .65fr); gap: 16px; }
@@ -26,25 +30,28 @@
     .box-face { stroke: #254858; stroke-width: 1; stroke-linejoin: round; }
     .box-label { font: 11px ui-monospace, monospace; fill: #122b36; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
     .axis { font: 12px ui-sans-serif, system-ui; fill: #344b59; font-weight: 700; }
-    .subtle { font-size: 12px; color: #61717e; } .scroll { overflow: auto; max-height: 380px; }
+    .subtle { font-size: 12px; color: #61717e; } .scroll { max-width: 100%; overflow-x: auto; overflow-y: auto; max-height: 380px; }
+    input[type="file"] { max-width: 100%; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; } th,td { text-align: left; padding: 8px 9px; border-bottom: 1px solid #e6ebef; white-space: nowrap; } th { background: #f5f8fa; position: sticky; top: 0; }
     .badge { display: inline-block; border-radius: 99px; padding: 2px 8px; font-size: 11px; font-weight: 700; } .placed { color: #155b3c; background: #e3f5eb; } .unplaced { color: #8b4410; background: #fff0db; }
     .limitations { color: #566572; font-size: 13px; } .limitations li { margin: 4px 0; }
-    @media(max-width:800px) { .layout { grid-template-columns: 1fr; } header { padding: 24px; } main { margin-top: 16px; } }
+    @media(max-width:800px) { .layout { grid-template-columns: minmax(0, 1fr); } header { padding: 24px; } main { margin-top: 16px; } }
   </style>
 </head>
 <body>
-<header><h1>Cargo fit planner</h1><p>Deterministic single-container placement preview · dimensions in millimetres · weights in kilograms</p></header>
+<header><h1>Cargo Fit Planner</h1><p>Deterministic single-container placement preview · dimensions in millimetres · weights in kilograms</p></header>
 <main>
   <section class="panel">
     <h2>1. Add cargo</h2>
     <p class="note">CSV is limited to 256 KiB, 100 source rows, and 100 expanded items. Dimensions use whole millimetres; weights use kilograms to 0.001 kg. After packing, exports match the displayed result; repack after making edits. Cost estimates are not included.</p>
     <div class="toolbar"><a class="button secondary" href="{% url 'cargo-template' %}">Download CSV template</a><button class="secondary" type="button" id="load-demo">Load synthetic example</button></div>
-    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+    {% if error %}<div class="error" role="alert"><h3>Could not pack this CSV</h3><p>{{ error }}</p></div>{% endif %}
+    {% if validation_errors %}<div class="error" role="alert" aria-labelledby="validation-title"><h3 id="validation-title">Fix the CSV rows below</h3><ul>{% for issue in validation_errors %}<li>{% if issue.row %}Row {{ issue.row }} · {% else %}CSV · {% endif %}{% if issue.field %}{{ issue.field }}: {% endif %}{{ issue.message }}</li>{% endfor %}</ul>{% if validation_errors_truncated %}<p>Only the first 20 errors are shown. Correct these entries and submit again to check for more.</p>{% endif %}</div>{% endif %}
     <form method="post" id="cargo-form">{% csrf_token %}
       <label for="cargo-csv"><strong>Cargo CSV</strong></label>
-      <p><input id="csv-file" type="file" accept=".csv,text/csv" aria-label="Choose a CSV file to load"></p>
-      <textarea id="cargo-csv" name="cargo_csv" spellcheck="false" required>{{ cargo_csv|default:'' }}</textarea>
+      <p><label for="csv-file">Load a CSV file into the editor</label><br><input id="csv-file" type="file" accept=".csv,text/csv" aria-describedby="upload-feedback"></p>
+      <p id="upload-feedback" class="subtle" aria-live="polite"></p>
+      <textarea id="cargo-csv" name="cargo_csv" spellcheck="false" required aria-describedby="csv-help upload-feedback{% if validation_errors %} validation-title{% endif %}" {% if validation_errors %}aria-invalid="true"{% endif %}>{{ cargo_csv|default:'' }}</textarea>
       <div class="toolbar" style="margin-top:12px"><button type="submit">Pack cargo</button><span class="subtle">Supported orientation: fixed or yaw rotation. A box can support cargo above it only when its stackable flag is true.</span></div>
     </form>
   </section>
@@ -54,12 +61,18 @@
   <section class="panel">
     <h2>2. Packing result · {{ result.container.name }}</h2>
     <div class="metrics">
-      <div class="metric"><strong>{{ result.totals.input_count }}</strong><span>input items</span></div>
+      <div class="metric"><strong>{{ source_row_count }}</strong><span>source rows</span></div>
+      <div class="metric"><strong>{{ result.totals.input_count }}</strong><span>expanded input units</span></div>
       <div class="metric"><strong>{{ result.totals.placed_count }}</strong><span>placed</span></div>
       <div class="metric"><strong>{{ result.totals.unplaced_count }}</strong><span>remaining</span></div>
-      <div class="metric"><strong>{{ result.totals.placed_weight_kg|floatformat:1 }} kg</strong><span>placed weight</span></div>
+      <div class="metric"><strong>{{ input_weight_display }} kg</strong><span>input weight</span></div>
+      <div class="metric"><strong>{{ placed_weight_display }} kg</strong><span>placed weight</span></div>
+      <div class="metric"><strong>{{ remaining_weight_display }} kg</strong><span>remaining weight</span></div>
       <div class="metric"><strong>{{ result.totals.placed_volume_m3|floatformat:2 }} m³</strong><span>placed volume</span></div>
+      <div class="metric"><strong>{{ payload_utilization_pct|floatformat:1 }}%</strong><span>placed weight ÷ payload limit</span></div>
+      <div class="metric"><strong>{{ volume_utilization_pct|floatformat:1 }}%</strong><span>placed box volume ÷ internal volume</span></div>
     </div>
+    <p class="note">These are capacity ratios only. The volume ratio does not account for gaps, orientation, support rules, or loading access; neither ratio predicts whether additional cargo will fit.</p>
     <p class="note">Container internal dimensions: {{ result.container.inside_mm.length }} × {{ result.container.inside_mm.width }} × {{ result.container.inside_mm.height }} mm · door: {{ result.container.door_mm.width }} × {{ result.container.door_mm.height }} mm · payload limit: {{ result.container.max_payload_kg }} kg · <a href="{{ result.container.source_url }}" target="_blank" rel="noopener">profile source</a> (checked {{ result.container.source_checked }})</p>
     <div class="toolbar">
       <form method="post" action="{% url 'export-csv' %}" class="export-form">{% csrf_token %}<input type="hidden" name="cargo_csv" value="{{ cargo_csv|escape }}"><button class="secondary">Export item CSV</button></form>
@@ -67,23 +80,31 @@
     </div>
   </section>
   <div class="layout">
-    <section class="panel"><h2>3. Isometric loading view</h2><div class="toolbar"><span id="rendered-count" class="subtle"></span><button id="rotate-scene" class="secondary" type="button">Change view angle</button></div><div class="scene-wrap"><svg id="scene" class="scene" viewBox="0 0 760 370" role="img" aria-label="Three-dimensional cargo placement preview"></svg></div><p class="subtle">Rendered from each placed item's x/y/z position and dx/dy/dz size. Labels match the item IDs in the table.</p></section>
+    <section class="panel"><h2>3. Isometric loading view</h2><div class="toolbar"><span id="rendered-count" class="subtle" aria-live="polite"></span><button id="rotate-scene" class="secondary" type="button">Change view angle</button></div><div class="scene-wrap"><svg id="scene" class="scene" viewBox="0 0 760 370" role="img" aria-labelledby="scene-title scene-description"><title id="scene-title">Three-dimensional cargo placement preview</title><desc id="scene-description">Axis-aligned placed cargo boxes. Use the item ID controls in the coordinates table to highlight a box.</desc></svg></div><p class="subtle">Rendered from each placed item's x/y/z position and dx/dy/dz size. Labels match the item IDs in the table.</p><p id="selection-feedback" class="subtle" aria-live="polite"></p></section>
     <section class="panel"><h2>Remaining cargo</h2>
-      {% if result.unplaced %}<div class="scroll"><table><thead><tr><th>Item ID</th><th>Reason</th></tr></thead><tbody>{% for item in result.unplaced %}<tr><td>{{ item.item_id }}</td><td>{{ item.reason }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p>All input items were placed.</p>{% endif %}
+      {% if result.unplaced %}<div class="scroll" tabindex="0" aria-label="Remaining cargo table; scroll horizontally if needed"><table><thead><tr><th>Item ID</th><th>Name</th><th>Size (L × W × H) mm</th><th>Weight</th><th>Reason</th></tr></thead><tbody>{% for item in unplaced_rows %}<tr><td>{{ item.item_id }}</td><td>{{ item.name }}</td><td>{{ item.length_mm }}, {{ item.width_mm }}, {{ item.height_mm }}</td><td>{{ item.weight_display }} kg</td><td>{% if item.reason == 'payload_limit' %}Would exceed payload limit{% elif item.reason == 'door_or_container_dimensions' %}Does not fit through the door or inside the container{% elif item.reason == 'no_feasible_space_found_by_heuristic' %}No position found by this heuristic{% else %}{{ item.reason }}{% endif %}</td></tr>{% endfor %}</tbody></table></div><p class="subtle">Export files retain the machine-readable reason codes.</p>{% else %}<p>All input items were placed.</p>{% endif %}
       <h2 style="margin-top:22px">Supported scope</h2><ul class="limitations"><li>One standard 20 ft container profile with verified published dimensions and payload limit.</li><li>Axis-aligned placement; fixed or yaw orientation only.</li><li>Stackability is a simple cargo flag, not a load-bearing strength model.</li><li>No loading sequence, lashing, point-load, or cargo strength calculations.</li></ul>
     </section>
   </div>
-  <section class="panel"><h2>Placed item coordinates</h2><div class="scroll"><table><thead><tr><th>Item ID</th><th>Position (x, y, z) mm</th><th>Size (dx, dy, dz) mm</th><th>Weight</th><th>Orientation</th></tr></thead><tbody>{% for item in result.placed %}<tr><td>{{ item.item_id }}</td><td>{{ item.x }}, {{ item.y }}, {{ item.z }}</td><td>{{ item.dx }}, {{ item.dy }}, {{ item.dz }}</td><td>{{ item.weight_kg }} kg</td><td>{{ item.orientation }}</td></tr>{% empty %}<tr><td colspan="5">No cargo placed.</td></tr>{% endfor %}</tbody></table></div></section>
+  <section class="panel"><h2>Placed item coordinates</h2><div class="scroll" tabindex="0" aria-label="Placed cargo coordinates table; scroll horizontally if needed"><table><thead><tr><th>Item ID</th><th>Name</th><th>Position (x, y, z) mm</th><th>Size (dx, dy, dz) mm</th><th>Weight</th><th>Orientation</th></tr></thead><tbody>{% for item in placed_rows %}<tr class="cargo-row" data-item-id="{{ item.item_id }}"><td><button class="item-link" type="button" data-item-id="{{ item.item_id }}" aria-label="Highlight placed item {{ item.item_id }}" aria-pressed="false">{{ item.item_id }}</button></td><td>{{ item.name }}</td><td>{{ item.x }}, {{ item.y }}, {{ item.z }}</td><td>{{ item.dx }}, {{ item.dy }}, {{ item.dz }}</td><td>{{ item.weight_display }} kg</td><td>{{ item.orientation }}</td></tr>{% empty %}<tr><td colspan="6">No cargo placed.</td></tr>{% endfor %}</tbody></table></div></section>
   {{ result|json_script:"packing-result" }}
   <script>
     const packed = JSON.parse(document.getElementById('packing-result').textContent);
     const scene = document.getElementById('scene');
     const ns = 'http://www.w3.org/2000/svg';
     const inner = packed.container.inside_mm, length = inner.length, width = inner.width, height = inner.height;
+    let selectedItemId = null;
+    function applySelection() {
+      scene.querySelectorAll('.box-face[data-item-id]').forEach(el => el.classList.toggle('is-highlighted', el.dataset.itemId === selectedItemId));
+      document.querySelectorAll('.cargo-row[data-item-id]').forEach(el => el.classList.toggle('is-highlighted', el.dataset.itemId === selectedItemId));
+    }
+    window.setCargoSelection = id => { selectedItemId = id; applySelection(); };
     const palette = ['#63c4d1','#f2b84b','#8ebd78','#b294d2','#e7866a','#65a5df'];
     const shades = (hex) => { const n=parseInt(hex.slice(1),16),r=n>>16,g=n>>8&255,b=n&255; return [`rgb(${Math.round(r*.82)},${Math.round(g*.82)},${Math.round(b*.82)})`,`rgb(${Math.round(r*.68)},${Math.round(g*.68)},${Math.round(b*.68)})`]; };
     function draw(angle) {
       scene.replaceChildren();
+      const title=document.createElementNS(ns,'title'); title.id='scene-title'; title.textContent='Three-dimensional cargo placement preview'; scene.appendChild(title);
+      const description=document.createElementNS(ns,'desc'); description.id='scene-description'; description.textContent='Axis-aligned placed cargo boxes. Use an item ID control in the coordinates table to highlight a box.'; scene.appendChild(description);
       const [vw,vh]=[760,370], theta=angle*Math.PI/180, c=Math.cos(theta), s=Math.sin(theta);
       const scale=Math.min((vw-100)/((length+width)*c),(vh-64)/((length+width)*s+height));
       const ox=vw/2-scale*(length-width)*c/2, oy=24+scale*height;
@@ -103,6 +124,7 @@
       faces.sort((a,b)=>a.depth-b.depth).forEach(face=>polygon(face.points,'box-face',face.fill,face.item_id));
       labels.forEach(label=>scene.appendChild(label));
       const start=pt(0,0,0); [[length,0,0,'X'],[0,width,0,'Y'],[0,0,height,'Z']].forEach(([x,y,z,name])=>{const end=pt(x,y,z),line=document.createElementNS(ns,'line');line.setAttribute('x1',start[0]);line.setAttribute('y1',start[1]);line.setAttribute('x2',end[0]);line.setAttribute('y2',end[1]);line.setAttribute('stroke','#314b59');line.setAttribute('stroke-width','2');scene.appendChild(line);const label=document.createElementNS(ns,'text');label.setAttribute('x',end[0]+5);label.setAttribute('y',end[1]-4);label.setAttribute('class','axis');label.textContent=name;scene.appendChild(label);});
+      applySelection();
     }
     draw(30);
     const renderedIds=new Set([...scene.querySelectorAll('.box-face[data-item-id]')].map(face=>face.getAttribute('data-item-id')));
@@ -115,8 +137,20 @@
   document.getElementById('load-demo').addEventListener('click', () => { document.getElementById('cargo-csv').value = JSON.parse(document.getElementById('demo-csv').textContent); });
   document.getElementById('csv-file').addEventListener('change', async (event) => {
     const file = event.target.files[0]; if (!file) return;
-    if (file.size > 262144) { alert('CSV files must be under 256 KiB.'); event.target.value = ''; return; }
-    document.getElementById('cargo-csv').value = await file.text();
+    const feedback = document.getElementById('upload-feedback');
+    if (file.size > 262144) { feedback.textContent = 'CSV files must be under 256 KiB.'; event.target.value = ''; return; }
+    try { document.getElementById('cargo-csv').value = await file.text(); feedback.textContent = `${file.name} loaded into the editor. Review it, then choose Pack cargo.`; }
+    catch (_) { feedback.textContent = 'The selected file could not be read. Try a UTF-8 CSV file.'; }
+  });
+  const buttons = [...document.querySelectorAll('.item-link')];
+  buttons.forEach(button => {
+    const id = button.dataset.itemId;
+    button.addEventListener('click', () => {
+      const active = button.getAttribute('aria-pressed') !== 'true';
+      buttons.forEach(other => other.setAttribute('aria-pressed', String(other === button && active)));
+      window.setCargoSelection(active ? id : null);
+      document.getElementById('selection-feedback').textContent = active ? `Highlighted ${id} in the loading view.` : 'No item selected.';
+    });
   });
 </script>
 </body>

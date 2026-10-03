@@ -3,7 +3,7 @@
 import json
 import unittest
 
-from optimization.packing import DEMO_CSV, pack_items, parse_csv
+from optimization.packing import CsvValidationError, DEMO_CSV, pack_items, parse_csv
 
 
 def item(item_id, *, length=500, width=400, height=300, weight=10, stackable=True, orientation="fixed"):
@@ -117,7 +117,7 @@ class PackingTests(unittest.TestCase):
         self.assertEqual(result["unplaced"][0]["reason"], "payload_limit")
 
     def test_invalid_csv_and_direct_items_are_rejected(self):
-        with self.assertRaisesRegex(ValueError, "duplicate item_id"):
+        with self.assertRaisesRegex(ValueError, "duplicate value"):
             parse_csv("item_id,name,length_mm,width_mm,height_mm,weight_kg,quantity,stackable,orientation\na,A,1,1,1,1,1,true,fixed\na,B,1,1,1,1,1,true,fixed\n")
         with self.assertRaisesRegex(ValueError, "finite"):
             pack_items([item("bad", weight=float("nan"))])
@@ -148,6 +148,69 @@ class PackingTests(unittest.TestCase):
             parse_csv("item_id,name,length_mm,width_mm,height_mm,weight_kg,quantity,stackable\n" + valid + "\n")
         with self.assertRaisesRegex(ValueError, "unexpected"):
             parse_csv(header + ",extra\n" + valid + ",x\n")
+
+    def test_csv_bom_and_leading_zero_quantity_are_accepted(self):
+        header = "item_id,name,length_mm,width_mm,height_mm,weight_kg,quantity,stackable,orientation"
+        rows = parse_csv("\ufeff" + header + "\na,A,10,10,10,1,0002,true,fixed\n")
+        self.assertEqual([row["item_id"] for row in rows], ["a-001", "a-002"])
+
+    def test_csv_validation_aggregates_rows_and_reports_physical_lines(self):
+        header = "item_id,name,length_mm,width_mm,height_mm,weight_kg,quantity,stackable,orientation"
+        source = (
+            header + "\n"
+            + 'a,"two-line\nname",0,NaN,-1,Inf,1.5,maybe,tip\n'
+            + "b,B,1,1,1,1,1,maybe,tip\n"
+        )
+        with self.assertRaises(CsvValidationError) as caught:
+            parse_csv(source)
+        error = caught.exception
+        self.assertGreaterEqual(len(error.errors), 8)
+        self.assertTrue(all(set(entry) == {"row", "field", "message"} for entry in error.errors))
+        self.assertEqual(
+            {(entry["row"], entry["field"]) for entry in error.errors if entry["field"] in {"length_mm", "width_mm", "height_mm", "weight_kg", "quantity", "stackable", "orientation"}},
+            {(3, "length_mm"), (3, "width_mm"), (3, "height_mm"), (3, "weight_kg"), (3, "quantity"),
+             (3, "stackable"), (3, "orientation"), (4, "stackable"), (4, "orientation")},
+        )
+        self.assertIn("row 3 length_mm:", str(error))
+        self.assertIn("whole number", str(error))
+
+    def test_csv_header_shape_row_width_and_malformed_syntax_are_structured(self):
+        header = "item_id,name,length_mm,width_mm,height_mm,weight_kg,quantity,stackable,orientation"
+        duplicate_header = "item_id,name,length_mm,width_mm,height_mm,weight_kg,quantity,stackable,item_id"
+        with self.assertRaises(CsvValidationError) as caught:
+            parse_csv(duplicate_header + "\n")
+        self.assertTrue(any(error["field"] == "item_id" for error in caught.exception.errors))
+        self.assertTrue(any(error["field"] == "orientation" for error in caught.exception.errors))
+        with self.assertRaises(CsvValidationError) as caught:
+            parse_csv(header + "\na,A,1,1,1,1,1,true,fixed,extra\n")
+        self.assertTrue(any(error["row"] == 2 and error["field"] == "columns" for error in caught.exception.errors))
+        with self.assertRaises(CsvValidationError) as caught:
+            parse_csv(header + '\na,"unterminated')
+        self.assertEqual(caught.exception.errors[0]["field"], "csv")
+        with self.assertRaises(CsvValidationError) as caught:
+            parse_csv(header + "\na,A,1,1,1,1,1,true\n")
+        self.assertTrue(any(error["row"] == 2 and error["field"] == "orientation" for error in caught.exception.errors))
+
+    def test_csv_limits_truncate_details_and_huge_quantity_does_not_escape(self):
+        header = "item_id,name,length_mm,width_mm,height_mm,weight_kg,quantity,stackable,orientation"
+        with self.assertRaises(CsvValidationError) as caught:
+            parse_csv(header + "\n" + (",,,,,,,,\n" * 10))
+        self.assertEqual(len(caught.exception.errors), 20)
+        self.assertTrue(caught.exception.truncated)
+        self.assertIn("further errors omitted", str(caught.exception))
+        with self.assertRaises(CsvValidationError) as caught:
+            parse_csv(header + "\na,A,1,1,1,1," + ("9" * 5000) + ",true,fixed\n")
+        self.assertTrue(any(error["field"] == "quantity" for error in caught.exception.errors))
+        with self.assertRaises(CsvValidationError) as caught:
+            parse_csv(header + "\na,A,1,1,1,1,1,true,fixed\n" + "\n".join(
+                f"i{i},I,1,1,1,1,1,true,fixed" for i in range(101)
+            ))
+        self.assertTrue(any(error["field"] == "rows" for error in caught.exception.errors))
+
+    def test_csv_invalid_unicode_has_structured_error(self):
+        with self.assertRaises(CsvValidationError) as caught:
+            parse_csv("\ud800")
+        self.assertEqual(caught.exception.errors[0]["field"], "csv")
 
 
 if __name__ == "__main__":

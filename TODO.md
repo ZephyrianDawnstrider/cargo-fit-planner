@@ -15,3 +15,11 @@ A separate synthetic CSV-to-pack demo is being added on branch cargo-mvp; the or
 ## 2026-10-03 — Cargo MVP acceptance supersedes prior status
 
 The synthetic cargo MVP implementation, isolated setup, focused checks, and headless browser walkthrough are complete. CSV upload, quantity conservation, feasibility output, remaining-item reasons, SVG/table ID parity, and both exports passed the recorded checks in `docs/evidence/cargo-mvp-2026-10-03.md`. The earlier status above is retained as historical progress; this section records the later acceptance result. Main-branch delivery identity is recorded in the user-facing delivery receipt.
+
+## 2026-10-03 — Cargo Fit Planner UI refinement
+
+The follow-up UI scope adds structured row-level CSV errors, actionable remaining-item details, explicit source-row versus expanded-unit and weight summaries, clearly bounded capacity ratios, accessible item-to-box selection that survives view redraw, and richer CSV export rows. The original MVP acceptance record above remains historical; refinement checks and browser screenshots are recorded in `docs/evidence/cargo-fit-planner-refinement-2026-10-03.md` after verification.
+
+## 2026-10-03 — Cargo Fit Planner refinement acceptance
+
+The refinement is verified: 28 focused tests pass, Django reports no system check issues, and the headless browser walkthrough passes at desktop and 375 px without document overflow or console errors. The evidence record above documents the validation, tables, summaries, selection interaction, exports, and screenshots. Local delivery identity and remote URL are documented after repository rename in the delivery receipt; earlier status sections remain historical.

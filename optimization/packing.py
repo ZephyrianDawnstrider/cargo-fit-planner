@@ -37,6 +37,7 @@ MAX_CSV_BYTES = 1_000_000
 MAX_ROWS = 100
 MAX_UNITS = 100
 MAX_ITEMS = 100
+MAX_CSV_ERRORS = 20
 
 CONTAINER = {
     "name": "20 ft standard (Hapag-Lloyd example)",
@@ -60,84 +61,149 @@ def _finite_number(value: Any, label: str) -> float:
     return number
 
 
-def _parse_flag(value: str, row_number: int) -> bool:
+class CsvValidationError(ValueError):
+    """All-or-nothing manifest validation details for forms and API callers."""
+
+    def __init__(self, errors: list[dict[str, Any]], *, truncated: bool = False):
+        self.errors = errors[:MAX_CSV_ERRORS]
+        self.truncated = truncated or len(errors) > MAX_CSV_ERRORS
+        summary = "; ".join(
+            (f"row {error['row']} " if error["row"] is not None else "")
+            + f"{error['field']}: {error['message']}"
+            for error in self.errors[:3]
+        )
+        omitted = " (further errors omitted)" if self.truncated else ""
+        super().__init__(f"CSV validation found {len(self.errors)} error(s): {summary}{omitted}")
+
+
+def _parse_flag(value: str) -> bool:
     normalized = value.strip().lower()
     if normalized in {"true", "yes", "1"}:
         return True
     if normalized in {"false", "no", "0"}:
         return False
-    raise ValueError(f"row {row_number}: stackable must be true/false, yes/no, or 1/0")
+    raise ValueError("must be true/false, yes/no, or 1/0")
 
 
 def parse_csv(text: str) -> list[dict[str, Any]]:
     """Validate the documented CSV and expand quantities to individual units."""
     if not isinstance(text, str):
-        raise ValueError("CSV input must be text")
-    if len(text.encode("utf-8")) > MAX_CSV_BYTES:
-        raise ValueError(f"CSV exceeds the {MAX_CSV_BYTES}-byte input limit")
+        raise CsvValidationError([{"row": None, "field": "csv", "message": "input must be text"}])
+    try:
+        encoded_size = len(text.encode("utf-8"))
+    except UnicodeEncodeError:
+        raise CsvValidationError([{"row": None, "field": "csv", "message": "input contains invalid Unicode"}]) from None
+    if encoded_size > MAX_CSV_BYTES:
+        raise CsvValidationError([{"row": None, "field": "csv", "message": f"exceeds the {MAX_CSV_BYTES}-byte input limit"}])
+    errors: list[dict[str, Any]] = []
+    truncated = False
+
+    def add_error(row: int | None, field: str, message: str) -> None:
+        nonlocal truncated
+        if len(errors) < MAX_CSV_ERRORS:
+            errors.append({"row": row, "field": field, "message": message})
+        else:
+            truncated = True
+
     try:
         reader = csv.DictReader(io.StringIO(text, newline=""), strict=True)
         headers = reader.fieldnames
         if headers is None:
-            raise ValueError("CSV must include a header row")
-        if len(headers) != len(set(headers)):
-            raise ValueError("CSV header contains duplicate columns")
+            add_error(None, "header", "a header row is required")
+            raise CsvValidationError(errors)
+        if headers and headers[0].startswith("\ufeff"):
+            headers[0] = headers[0].lstrip("\ufeff")
+            reader.fieldnames = headers
+        seen_headers: set[str] = set()
+        for header in headers:
+            if header in seen_headers:
+                add_error(None, header or "header", f"duplicate column {header!r}")
+            seen_headers.add(header)
         missing = [header for header in CSV_HEADERS if header not in headers]
         extra = [header for header in headers if header not in CSV_HEADERS]
-        if missing or extra:
-            details = []
-            if missing:
-                details.append("missing: " + ", ".join(missing))
-            if extra:
-                details.append("unexpected: " + ", ".join(extra))
-            raise ValueError("CSV columns " + "; ".join(details))
+        for header in missing:
+            add_error(None, header, "required column is missing")
+        for header in extra:
+            add_error(None, header, "unexpected column")
+        if errors:
+            raise CsvValidationError(errors, truncated=truncated)
         expanded: list[dict[str, Any]] = []
         seen_ids: set[str] = set()
         source_rows = 0
-        for row_number, row in enumerate(reader, start=2):
+        for row in reader:
             source_rows += 1
             if source_rows > MAX_ROWS:
-                raise ValueError(f"CSV exceeds the {MAX_ROWS}-row limit")
+                add_error(reader.line_num, "rows", f"exceeds the {MAX_ROWS}-row limit")
+                break
+            row_number = reader.line_num or None
             if None in row:
-                raise ValueError(f"row {row_number}: too many columns")
-            if any(value is None for value in row.values()):
-                raise ValueError(f"row {row_number}: too few columns")
-            source_id = row["item_id"].strip()
-            name = row["name"].strip()
-            if not source_id or not name:
-                raise ValueError(f"row {row_number}: item_id and name are required")
-            if source_id in seen_ids:
-                raise ValueError(f"row {row_number}: duplicate item_id {source_id!r}")
-            seen_ids.add(source_id)
+                add_error(row_number, "columns", "too many columns")
+            source_id = (row.get("item_id") or "").strip()
+            name = (row.get("name") or "").strip()
+            if not source_id:
+                add_error(row_number, "item_id", "required value is blank")
+            elif source_id in seen_ids:
+                add_error(row_number, "item_id", f"duplicate value {source_id!r}")
+            else:
+                seen_ids.add(source_id)
+            if not name:
+                add_error(row_number, "name", "required value is blank")
+            for field in CSV_HEADERS[2:]:
+                if field not in row or row[field] is None or not row[field].strip():
+                    add_error(row_number, field, "required value is blank")
             dimensions = {}
             for field in ("length_mm", "width_mm", "height_mm"):
-                raw = row[field].strip()
-                if not raw:
-                    raise ValueError(f"row {row_number}: {field} is required")
-                value = _finite_number(raw, f"row {row_number} {field}")
-                if value < 1 or not value.is_integer():
-                    raise ValueError(f"row {row_number}: {field} must be a whole number of millimetres (at least 1)")
-                dimensions[field] = value
-            raw_weight = row["weight_kg"].strip()
-            if not raw_weight:
-                raise ValueError(f"row {row_number}: weight_kg is required")
-            weight = _finite_number(raw_weight, f"row {row_number} weight_kg")
-            if weight < 0:
-                raise ValueError(f"row {row_number}: weight_kg cannot be negative")
-            if weight != round(weight, 3):
-                raise ValueError(f"row {row_number}: weight_kg must use increments of 0.001 kg")
-            raw_quantity = row["quantity"].strip()
-            if not re.fullmatch(r"[0-9]+", raw_quantity):
-                raise ValueError(f"row {row_number}: quantity must be a positive integer")
-            quantity = int(raw_quantity)
-            if quantity <= 0:
-                raise ValueError(f"row {row_number}: quantity must be a positive integer")
-            if len(expanded) + quantity > MAX_UNITS:
-                raise ValueError(f"expanded CSV exceeds the {MAX_UNITS}-unit limit")
-            stackable = _parse_flag(row["stackable"], row_number)
-            orientation = row["orientation"].strip().lower()
-            if orientation not in {"fixed", "yaw"}:
-                raise ValueError(f"row {row_number}: orientation must be fixed or yaw")
+                raw = row.get(field) or ""
+                if raw.strip():
+                    try:
+                        value = _finite_number(raw.strip(), field)
+                        if value < 1 or not value.is_integer():
+                            raise ValueError("must be a whole number of millimetres (at least 1)")
+                        dimensions[field] = value
+                    except ValueError as exc:
+                        add_error(row_number, field, str(exc))
+            weight = None
+            try:
+                weight = _finite_number(row.get("weight_kg") or "", "weight_kg")
+                if weight < 0:
+                    raise ValueError("cannot be negative")
+                if weight != round(weight, 3):
+                    raise ValueError("must use increments of 0.001 kg")
+            except ValueError as exc:
+                if row.get("weight_kg") and row["weight_kg"].strip():
+                    add_error(row_number, "weight_kg", str(exc))
+                weight = None
+            quantity = None
+            raw_quantity = row.get("quantity") or ""
+            if raw_quantity.strip():
+                quantity_text = raw_quantity.strip()
+                if not re.fullmatch(r"[0-9]+", quantity_text):
+                    add_error(row_number, "quantity", "must be a positive integer")
+                else:
+                    quantity_text = quantity_text.lstrip("0") or "0"
+                    if len(quantity_text) > len(str(MAX_UNITS)):
+                        add_error(row_number, "quantity", f"expanded manifest exceeds the {MAX_UNITS}-unit limit")
+                    else:
+                        quantity = int(quantity_text)
+                        if quantity <= 0:
+                            add_error(row_number, "quantity", "must be a positive integer")
+                        elif len(expanded) + quantity > MAX_UNITS:
+                            add_error(row_number, "quantity", f"expanded manifest exceeds the {MAX_UNITS}-unit limit")
+                            quantity = None
+            stackable = None
+            if row.get("stackable") and row["stackable"].strip():
+                try:
+                    stackable = _parse_flag(row["stackable"])
+                except ValueError as exc:
+                    add_error(row_number, "stackable", str(exc))
+            orientation = (row.get("orientation") or "").strip().lower()
+            if orientation and orientation not in {"fixed", "yaw"}:
+                add_error(row_number, "orientation", "must be fixed or yaw")
+            valid = bool(source_id and name and dimensions.keys() >= {"length_mm", "width_mm", "height_mm"}
+                         and weight is not None and quantity and stackable is not None
+                         and orientation in {"fixed", "yaw"})
+            if not valid:
+                continue
             for unit_index in range(1, quantity + 1):
                 expanded.append({
                     "item_id": f"{source_id}-{unit_index:03d}",
@@ -148,11 +214,14 @@ def parse_csv(text: str) -> list[dict[str, Any]]:
                     "stackable": stackable,
                     "orientation": orientation,
                 })
+        if truncated or errors:
+            raise CsvValidationError(errors, truncated=truncated)
         if not expanded:
-            raise ValueError("CSV must contain at least one cargo item")
+            raise CsvValidationError([{"row": None, "field": "rows", "message": "at least one cargo item is required"}])
         return expanded
     except csv.Error as exc:
-        raise ValueError(f"invalid CSV: {exc}") from exc
+        add_error(reader.line_num or None, "csv", f"invalid CSV syntax: {exc}")
+        raise CsvValidationError(errors, truncated=truncated) from exc
 
 
 def _validate_items(items: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
