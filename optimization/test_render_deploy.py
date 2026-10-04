@@ -5,6 +5,7 @@ import subprocess
 from unittest.mock import patch
 
 from django.http import HttpResponse
+from django.core.exceptions import TooManyFieldsSent
 from django.test import SimpleTestCase, override_settings
 from django.test import RequestFactory
 
@@ -34,6 +35,7 @@ class RenderDeploymentSettingsTests(SimpleTestCase):
         self.assertNotIn("django.contrib.sessions.middleware.SessionMiddleware", module.MIDDLEWARE)
         self.assertNotIn("optimization.routers", module.DATABASE_ROUTERS)
         self.assertFalse(module.WEATHER_FREE_API_ENABLED)
+        self.assertEqual(module.DATA_UPLOAD_MAX_NUMBER_FIELDS, 16)
         self.assertTrue(module.CSRF_COOKIE_SECURE)
         self.assertTrue(module.SECURE_SSL_REDIRECT)
         self.assertLess(module.MIDDLEWARE.index("optimization.admission.ComputeRateLimitMiddleware"), module.MIDDLEWARE.index("django.middleware.csrf.CsrfViewMiddleware"))
@@ -135,6 +137,14 @@ class ComputeRateLimitTests(SimpleTestCase):
         request.META["CONTENT_LENGTH"] = str(ComputeRateLimitMiddleware.MAX_REQUEST_BYTES + 1)
         rejected = self.middleware(request)
         self.assertEqual(rejected.status_code, 413)
+
+    def test_form_field_limit_allows_current_shipment_form_and_rejects_17th_field(self):
+        with override_settings(DATA_UPLOAD_MAX_NUMBER_FIELDS=16):
+            accepted = self.factory.post("/", data={f"field_{i}": "x" for i in range(16)})
+            self.assertEqual(len(accepted.POST), 16)
+            request = self.factory.post("/", data={f"field_{i}": "x" for i in range(17)})
+            with self.assertRaises(TooManyFieldsSent):
+                _ = request.POST
 
     def test_unknown_length_request_is_read_only_to_the_hard_body_limit(self):
         class Request:

@@ -1,15 +1,20 @@
-"""Deterministic, conservative MVP for packing cargo into one 20 ft container.
+"""Deterministic, conservative MVP for packing cargo into a dry container.
 
-The profile is the Hapag-Lloyd 20' standard example published at
-https://www.hapag-lloyd.com/en/services-information/cargo-fleet/container/20-standard.html
-(checked 2026-10-03). Values are an example, not universal container limits.
+Profiles are published Maersk dry-equipment examples checked 2026-10-04.
+They are examples, not universal container limits; actual equipment plates
+and carrier specifications govern.
 
 This is a deterministic feasibility heuristic, not an optimizer. Inputs use
 whole millimetres and weights in 0.001 kg increments. It models
-rectangular cargo, straight-through door clearance, container containment,
-non-overlap, payload, and conservative single-item full-footprint support.
+rectangular cargo (including explicitly entered palletized and drum/roll
+bounding boxes), straight-through door clearance, container containment,
+non-overlap, payload, floor-only placement, and conservative single-item
+full-footprint support. Dangerous goods are held for manual compliance review.
 It does not model load strength, lashing, axle/floor point loads, loading
 sequence/access after placement, or cargo-specific handling constraints.
+`palletized` dimensions and weight must include the entire palletized unit;
+`drum_roll` is an upright axis-aligned bounding box and is never tipped or
+rolled. A dangerous-goods hold is not an IMDG compliance or segregation check.
 """
 
 from __future__ import annotations
@@ -33,6 +38,10 @@ CSV_HEADERS = (
     "item_id", "name", "length_mm", "width_mm", "height_mm", "weight_kg",
     "quantity", "stackable", "orientation",
 )
+OPTIONAL_CSV_HEADERS = (
+    "load_unit_type", "floor_only", "is_dg", "un_number", "imdg_class", "packing_group",
+)
+LOAD_UNIT_TYPES = {"carton_crate", "palletized", "drum_roll"}
 MAX_CSV_BYTES = 1_000_000
 MAX_ROWS = 100
 MAX_UNITS = 100
@@ -43,14 +52,36 @@ MAX_ITEM_NAME_CHARS = 120
 MAX_CANDIDATE_CHECKS_PER_PACK = 100_000
 MAX_CANDIDATE_CHECKS_PER_ORIENTATION = 2_000
 
-CONTAINER = {
-    "name": "20 ft standard (Hapag-Lloyd example)",
-    "source_url": "https://www.hapag-lloyd.com/en/services-information/cargo-fleet/container/20-standard.html",
-    "source_checked": "2026-10-03",
-    "inside_mm": {"length": 5900, "width": 2352, "height": 2395},
-    "door_mm": {"width": 2340, "height": 2292},
-    "max_payload_kg": 28130,
+_PROFILE_SOURCE = "https://www.maersk.com.cn/~/media_sc9/maersk/local-information/files/africa/madagascar/overview/container-type-and-sizes/dry-equipment-specifications.pdf"
+_PROFILE_NOTICE = "Published dry-equipment example; dimensions and payload vary by actual unit. The actual CSC plate and carrier specifications govern."
+CONTAINERS = {
+    "20std": {
+        "id": "20std", "name": "20 ft standard dry (Maersk example)",
+        "family": "freight_container", "type": "dry_standard", "status": "supported_packing",
+        "source_url": _PROFILE_SOURCE, "source_checked": "2026-10-04",
+        "profile_notice": _PROFILE_NOTICE,
+        "inside_mm": {"length": 5896, "width": 2350, "height": 2393},
+        "door_mm": {"width": 2350, "height": 2274}, "max_payload_kg": 28200,
+    },
+    "40std": {
+        "id": "40std", "name": "40 ft standard dry (Maersk example)",
+        "family": "freight_container", "type": "dry_standard", "status": "supported_packing",
+        "source_url": _PROFILE_SOURCE, "source_checked": "2026-10-04",
+        "profile_notice": _PROFILE_NOTICE,
+        "inside_mm": {"length": 12032, "width": 2350, "height": 2393},
+        "door_mm": {"width": 2340, "height": 2274}, "max_payload_kg": 28800,
+    },
+    "40hc": {
+        "id": "40hc", "name": "40 ft high-cube dry (Maersk example)",
+        "family": "freight_container", "type": "dry_high_cube", "status": "supported_packing",
+        "source_url": _PROFILE_SOURCE, "source_checked": "2026-10-04",
+        "profile_notice": _PROFILE_NOTICE,
+        "inside_mm": {"length": 12032, "width": 2350, "height": 2697},
+        "door_mm": {"width": 2340, "height": 2577}, "max_payload_kg": 28620,
+    },
 }
+# Backward-compatible default export for existing callers importing CONTAINER.
+CONTAINER = CONTAINERS["20std"]
 
 
 def _finite_number(value: Any, label: str) -> float:
@@ -123,8 +154,9 @@ def parse_csv(text: str) -> list[dict[str, Any]]:
             if header in seen_headers:
                 add_error(None, header or "header", f"duplicate column {header!r}")
             seen_headers.add(header)
+        allowed_headers = set(CSV_HEADERS) | set(OPTIONAL_CSV_HEADERS)
         missing = [header for header in CSV_HEADERS if header not in headers]
-        extra = [header for header in headers if header not in CSV_HEADERS]
+        extra = [header for header in headers if header not in allowed_headers]
         for header in missing:
             add_error(None, header, "required column is missing")
         for header in extra:
@@ -207,9 +239,35 @@ def parse_csv(text: str) -> list[dict[str, Any]]:
             orientation = (row.get("orientation") or "").strip().lower()
             if orientation and orientation not in {"fixed", "yaw"}:
                 add_error(row_number, "orientation", "must be fixed or yaw")
+            load_unit_type = "carton_crate"
+            if "load_unit_type" in headers:
+                load_unit_type = (row.get("load_unit_type") or "").strip().lower()
+                if load_unit_type not in LOAD_UNIT_TYPES:
+                    add_error(row_number, "load_unit_type", "must be carton_crate, palletized, or drum_roll")
+            optional_flags = {}
+            for field in ("floor_only", "is_dg"):
+                if field not in headers:
+                    optional_flags[field] = False
+                elif not (row.get(field) or "").strip():
+                    add_error(row_number, field, "required value is blank when this column is present")
+                else:
+                    try:
+                        optional_flags[field] = _parse_flag(row[field])
+                    except ValueError as exc:
+                        add_error(row_number, field, str(exc))
+            dg_metadata = {}
+            for field, limit in (("un_number", 16), ("imdg_class", 16), ("packing_group", 16)):
+                value = (row.get(field) or "").strip()
+                if len(value) > limit:
+                    add_error(row_number, field, f"must be at most {limit} characters")
+                dg_metadata[field] = value
+                if value and optional_flags.get("is_dg") is False:
+                    add_error(row_number, field, "classification metadata requires is_dg=true")
             valid = bool(source_id and name and dimensions.keys() >= {"length_mm", "width_mm", "height_mm"}
                          and weight is not None and quantity and stackable is not None
-                         and orientation in {"fixed", "yaw"})
+                         and orientation in {"fixed", "yaw"} and load_unit_type in LOAD_UNIT_TYPES
+                         and all(field in optional_flags for field in ("floor_only", "is_dg"))
+                         and not any(len(value) > 16 for value in dg_metadata.values()))
             if not valid:
                 continue
             for unit_index in range(1, quantity + 1):
@@ -221,6 +279,10 @@ def parse_csv(text: str) -> list[dict[str, Any]]:
                     "weight_kg": weight,
                     "stackable": stackable,
                     "orientation": orientation,
+                    "load_unit_type": load_unit_type,
+                    "floor_only": optional_flags["floor_only"],
+                    "is_dg": optional_flags["is_dg"],
+                    **dg_metadata,
                 })
         if truncated or errors:
             raise CsvValidationError(errors, truncated=truncated)
@@ -277,6 +339,24 @@ def _validate_items(items: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
         if orientation not in {"fixed", "yaw"}:
             raise ValueError(f"item {item_id}: orientation must be fixed or yaw")
         data.update(weight_kg=weight, stackable=item["stackable"], orientation=orientation)
+        load_unit_type = item.get("load_unit_type", "carton_crate")
+        if not isinstance(load_unit_type, str) or load_unit_type not in LOAD_UNIT_TYPES:
+            raise ValueError(f"item {item_id}: load_unit_type must be carton_crate, palletized, or drum_roll")
+        data["load_unit_type"] = load_unit_type
+        for field in ("floor_only", "is_dg"):
+            flag = item.get(field, False)
+            if not isinstance(flag, bool):
+                raise ValueError(f"item {item_id}: {field} must be boolean")
+            data[field] = flag
+        for field in ("un_number", "imdg_class", "packing_group"):
+            value = item.get(field, "")
+            if value is None:
+                value = ""
+            if not isinstance(value, str) or len(value.strip()) > 16:
+                raise ValueError(f"item {item_id}: {field} must be text of at most 16 characters")
+            data[field] = value.strip()
+            if data[field] and not data["is_dg"]:
+                raise ValueError(f"item {item_id}: {field} requires is_dg=true")
         if "source_item_id" in item:
             data["source_item_id"] = str(item["source_item_id"])
         normalized.append(data)
@@ -298,20 +378,79 @@ def _orientations(item: dict[str, Any]) -> list[tuple[float, float, str]]:
     return [fixed]
 
 
-def _fits_door_and_container(item: dict[str, Any]) -> bool:
+def _resolve_container(container_id: str) -> dict[str, Any]:
+    if not isinstance(container_id, str) or container_id not in CONTAINERS:
+        choices = ", ".join(CONTAINERS)
+        raise ValueError(f"unsupported container_id; choose one of: {choices}")
+    return CONTAINERS[container_id]
+
+
+def _custom_container(profile: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(profile, dict):
+        raise ValueError("custom_profile must be an object")
+    if any(not isinstance(key, str) for key in profile):
+        raise ValueError("custom_profile keys must be text")
+    allowed = {"name", "inside_mm", "door_mm", "max_payload_kg", "dimensions_source"}
+    extra = set(profile) - allowed
+    missing = allowed - set(profile)
+    if extra or missing:
+        raise ValueError(f"custom_profile keys invalid; missing={sorted(missing)}, unexpected={sorted(extra)}")
+    name = profile["name"]
+    if not isinstance(name, str) or not name.strip() or len(name.strip()) > MAX_ITEM_NAME_CHARS:
+        raise ValueError(f"custom_profile name must be nonblank and at most {MAX_ITEM_NAME_CHARS} characters")
+    source = profile["dimensions_source"]
+    source_keys = {"kind", "reference"}
+    if not isinstance(source, dict) or any(not isinstance(key, str) for key in source) or set(source) != source_keys:
+        raise ValueError("dimensions_source must contain exactly kind and reference")
+    kind, reference = source["kind"], source["reference"]
+    if not isinstance(kind, str) or kind not in {"user_measurement", "equipment_plate", "carrier_document"}:
+        raise ValueError("dimensions_source.kind must be user_measurement, equipment_plate, or carrier_document")
+    if not isinstance(reference, str) or not reference.strip() or len(reference.strip()) > 240:
+        raise ValueError("dimensions_source.reference must be nonblank text of at most 240 characters")
+
+    def dimensions(value: Any, keys: set[str], label: str) -> dict[str, int]:
+        if not isinstance(value, dict) or set(value) != keys:
+            raise ValueError(f"custom_profile.{label} must contain exactly {', '.join(sorted(keys))}")
+        parsed = {}
+        for key, raw in value.items():
+            number = _finite_number(raw, f"custom_profile.{label}.{key}")
+            if number < 1 or not number.is_integer() or number > 100_000:
+                raise ValueError(f"custom_profile.{label}.{key} must be a whole millimetre value from 1 to 100000")
+            parsed[key] = int(number)
+        return parsed
+
+    inside = dimensions(profile["inside_mm"], {"length", "width", "height"}, "inside_mm")
+    door = dimensions(profile["door_mm"], {"width", "height"}, "door_mm")
+    if door["width"] > inside["width"] or door["height"] > inside["height"]:
+        raise ValueError("custom_profile door dimensions cannot exceed inside width or height")
+    payload = _finite_number(profile["max_payload_kg"], "custom_profile.max_payload_kg")
+    if not 0 < payload <= 1_000_000 or payload != round(payload, 3):
+        raise ValueError("custom_profile.max_payload_kg must be positive, at most 1000000 kg, at 0.001 kg precision")
+    return {
+        "id": "custom_dry", "name": name.strip(), "family": "freight_container",
+        "type": "other_dry_closed_box", "status": "unverified_measured",
+        "source_checked": None, "source_url": None,
+        "dimensions_source": {"kind": kind, "reference": reference.strip()},
+        "profile_notice": "User-supplied dry closed-box dimensions and payload; unverified. Actual equipment plate and carrier specifications govern. Solver dimensional limits are capped at 100000 mm and 1000000 kg.",
+        "inside_mm": inside, "door_mm": door, "max_payload_kg": payload,
+    }
+
+
+def _fits_door_and_container(item: dict[str, Any], container: dict[str, Any]) -> bool:
     return any(
-        orientation[1] <= CONTAINER["door_mm"]["width"]
-        and item["height_mm"] <= CONTAINER["door_mm"]["height"]
-        and orientation[0] <= CONTAINER["inside_mm"]["length"]
-        and orientation[1] <= CONTAINER["inside_mm"]["width"]
-        and item["height_mm"] <= CONTAINER["inside_mm"]["height"]
+        orientation[1] <= container["door_mm"]["width"]
+        and item["height_mm"] <= container["door_mm"]["height"]
+        and orientation[0] <= container["inside_mm"]["length"]
+        and orientation[1] <= container["inside_mm"]["width"]
+        and item["height_mm"] <= container["inside_mm"]["height"]
         for orientation in _orientations(item)
     )
 
 
-def _candidate(item: dict[str, Any], placed: list[dict[str, Any]], budget: list[int]) -> tuple[dict[str, Any] | None, bool]:
-    inner = CONTAINER["inside_mm"]
-    door = CONTAINER["door_mm"]
+def _candidate(item: dict[str, Any], placed: list[dict[str, Any]], budget: list[int],
+               container: dict[str, Any]) -> tuple[dict[str, Any] | None, bool]:
+    inner = container["inside_mm"]
+    door = container["door_mm"]
     for dx, dy, direction in _orientations(item):
         examined = 0
         dz = item["height_mm"]
@@ -320,7 +459,7 @@ def _candidate(item: dict[str, Any], placed: list[dict[str, Any]], budget: list[
             continue
         if dx > inner["length"] or dy > inner["width"] or dz > inner["height"]:
             continue
-        supports = [None] + [p for p in placed if p["stackable"]]
+        supports = [None] if item["floor_only"] else [None] + [p for p in placed if p["stackable"]]
         for support in supports:
             z = 0.0 if support is None else support["z"] + support["dz"]
             if z + dz > inner["height"]:
@@ -360,8 +499,21 @@ def _candidate(item: dict[str, Any], placed: list[dict[str, Any]], budget: list[
     return None, False
 
 
-def pack_items(items: Iterable[dict[str, Any]]) -> dict[str, Any]:
-    """Pack as many units as a stable greedy heuristic can feasibly place."""
+def pack_items(items: Iterable[dict[str, Any]], container_id: str = "20std", *,
+               custom_profile: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Pack eligible units for one selected dry container profile.
+
+    Dangerous-goods units are retained as manual-compliance holds and never
+    positioned. All other placements are only a geometric feasibility preview.
+    """
+    if container_id == "custom_dry":
+        if custom_profile is None:
+            raise ValueError("custom_profile is required when container_id='custom_dry'")
+        container = _custom_container(custom_profile)
+    else:
+        if custom_profile is not None:
+            raise ValueError("custom_profile may only be supplied with container_id='custom_dry'")
+        container = _resolve_container(container_id)
     normalized = _validate_items(items)
     normalized.sort(key=lambda item: (
         -(item["length_mm"] * item["width_mm"] * item["height_mm"]),
@@ -370,43 +522,51 @@ def pack_items(items: Iterable[dict[str, Any]]) -> dict[str, Any]:
     placed: list[dict[str, Any]] = []
     unplaced: list[dict[str, Any]] = []
     payload_grams = 0
+    hold_count = 0
     candidate_budget = [MAX_CANDIDATE_CHECKS_PER_PACK]
     search_exhausted = False
     for item in normalized:
+        if item["is_dg"]:
+            hold_count += 1
+            unplaced.append({**item, "reason": "manual_compliance_hold"})
+            continue
         # Reject an overweight item before converting kg to integer grams;
         # very large but finite values can overflow Python's float-to-int path.
-        if item["weight_kg"] > CONTAINER["max_payload_kg"]:
+        if item["weight_kg"] > container["max_payload_kg"]:
             unplaced.append({**item, "reason": "payload_limit"})
             continue
         item_grams = int(round(item["weight_kg"] * 1000))
-        if payload_grams + item_grams > CONTAINER["max_payload_kg"] * 1000:
+        if payload_grams + item_grams > container["max_payload_kg"] * 1000:
             unplaced.append({**item, "reason": "payload_limit"})
             continue
-        if not _fits_door_and_container(item):
+        if not _fits_door_and_container(item, container):
             unplaced.append({**item, "reason": "door_or_container_dimensions"})
             continue
         if search_exhausted:
             unplaced.append({**item, "reason": "search_budget_exhausted"})
             continue
-        position, budget_exhausted = _candidate(item, placed, candidate_budget)
+        position, budget_exhausted = _candidate(item, placed, candidate_budget, container)
         if budget_exhausted:
             search_exhausted = True
             unplaced.append({**item, "reason": "search_budget_exhausted"})
             continue
         if position is None:
-            unplaced.append({**item, "reason": "no_feasible_space_found_by_heuristic"})
+            reason = "floor_only_no_floor_space" if item["floor_only"] else "no_feasible_space_found_by_heuristic"
+            unplaced.append({**item, "reason": reason})
             continue
         placed.append({**item, **position, "rotation_deg": 90 if position["orientation"] == "yaw" else 0})
         payload_grams += item_grams
     total_volume = sum(p["dx"] * p["dy"] * p["dz"] for p in placed) / 1_000_000_000
     return {
-        "container": {**CONTAINER, "inside_mm": dict(CONTAINER["inside_mm"]), "door_mm": dict(CONTAINER["door_mm"])},
+        "container": {**container, "inside_mm": dict(container["inside_mm"]), "door_mm": dict(container["door_mm"])},
         "placed": placed,
         "unplaced": unplaced,
+        "readiness": "manual_compliance_hold" if hold_count else "packing_preview_only",
         "totals": {
             "input_count": len(normalized),
             "placed_count": len(placed),
             "unplaced_count": len(unplaced),
+            "manual_compliance_hold_count": hold_count,
             "placed_weight_kg": payload_grams / 1000,
             "placed_volume_m3": total_volume,
         },

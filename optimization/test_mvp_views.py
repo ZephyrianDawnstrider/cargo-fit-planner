@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 
 from django.test import SimpleTestCase
 from django.urls import reverse
@@ -19,6 +20,13 @@ class CargoMvpViewTests(SimpleTestCase):
         self.assertContains(response, "Load sample cargo")
         self.assertContains(response, "Paste Excel rows")
         self.assertContains(response, "Dimension entry unit")
+        self.assertContains(response, "20 ft standard dry")
+        self.assertContains(response, "40 ft high-cube dry")
+        self.assertContains(response, "Custom measured dry closed box")
+        self.assertContains(response, "Browse other equipment families")
+        self.assertContains(response, "Shipment reference")
+        self.assertContains(response, "Dangerous goods")
+        self.assertContains(response, "Floor only")
         self.assertContains(response, 'id="cargo-editor"')
         self.assertContains(response, 'id="csv-editor"')
         self.assertContains(response, 'id="demo-csv"')
@@ -76,6 +84,119 @@ class CargoMvpViewTests(SimpleTestCase):
         export = self.client.post(reverse("export-csv"), {"cargo_csv": response.context["cargo_csv"]})
         self.assertEqual(export.status_code, 200)
         self.assertContains(response, "Excel pallet")
+
+    def test_selected_40hc_profile_and_shipment_references_are_in_immutable_exports(self):
+        source = (
+            "item_id,name,length_mm,width_mm,height_mm,weight_kg,quantity,stackable,orientation\n"
+            "BOX,Test box,400,300,200,12.5,1,true,fixed\n"
+        )
+        submitted = {
+            "cargo_csv": source, "container_id": "40hc", "shipment_reference": "=LOAD-42",
+            "booking_reference": "BOOK-17", "bill_of_lading": "BOL-5", "shipper": "Sender",
+            "consignee": "Receiver", "origin": "A", "destination": "B",
+        }
+        response = self.client.post(reverse("upload"), submitted)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["result"]["container"]["id"], "40hc")
+        self.assertIn('name="container_id" value="40hc"', response.content.decode("utf-8"))
+        csv_response = self.client.post(reverse("export-csv"), submitted)
+        rows = list(csv.DictReader(io.StringIO(csv_response.content.decode("utf-8"))))
+        self.assertEqual(csv_response.status_code, 200)
+        self.assertEqual(rows[0]["container_id"], "40hc")
+        self.assertEqual(rows[0]["profile_length_mm"], "12032")
+        self.assertEqual(rows[0]["profile_height_mm"], "2697")
+        self.assertEqual(rows[0]["payload_limit_kg"], "28620")
+        self.assertEqual(rows[0]["shipment_reference"], "'=LOAD-42")
+        self.assertEqual(rows[0]["booking_reference"], "BOOK-17")
+        self.assertEqual(rows[0]["bill_of_lading"], "BOL-5")
+        json_response = self.client.post(reverse("export-json"), submitted)
+        payload = json_response.json()
+        self.assertEqual(payload["container"]["id"], "40hc")
+        self.assertEqual(payload["shipment"]["shipment_reference"], "=LOAD-42")
+
+    def test_dangerous_goods_are_withheld_and_show_a_manual_compliance_hold(self):
+        source = (
+            "item_id,name,length_mm,width_mm,height_mm,weight_kg,quantity,stackable,orientation,"
+            "load_unit_type,floor_only,is_dg,un_number,imdg_class,packing_group\n"
+            "DG,Paint,100,100,100,20,1,true,fixed,drum_roll,true,true,UN1263,3,II\n"
+            "SAFE,Carton,100,100,100,2,1,true,fixed,carton_crate,false,false,,,\n"
+        )
+        response = self.client.post(reverse("upload"), {"cargo_csv": source})
+        result = response.context["result"]
+        self.assertEqual(result["readiness"], "manual_compliance_hold")
+        self.assertEqual(result["totals"]["manual_compliance_hold_count"], 1)
+        dg = next(item for item in result["unplaced"] if item["source_item_id"] == "DG")
+        self.assertEqual(dg["reason"], "manual_compliance_hold")
+        self.assertEqual((dg["load_unit_type"], dg["floor_only"], dg["un_number"], dg["imdg_class"], dg["packing_group"]),
+                         ("drum_roll", True, "UN1263", "3", "II"))
+        self.assertContains(response, "MANUAL COMPLIANCE HOLD")
+        self.assertContains(response, "not an IMDG classification check")
+        export = self.client.post(reverse("export-csv"), {"cargo_csv": source})
+        rows = list(csv.DictReader(io.StringIO(export.content.decode("utf-8"))))
+        dg_row = next(row for row in rows if row["source_item_id"] == "DG")
+        self.assertEqual(dg_row["reason"], "manual_compliance_hold")
+        self.assertEqual((dg_row["load_unit_type"], dg_row["floor_only"], dg_row["is_dg"], dg_row["un_number"]),
+                         ("drum_roll", "True", "True", "UN1263"))
+
+    def test_custom_dry_profile_provenance_round_trips_into_exports(self):
+        profile = {
+            "name": "Measured closed box",
+            "inside_mm": {"length": 5000, "width": 2200, "height": 2300},
+            "door_mm": {"width": 2100, "height": 2200},
+            "max_payload_kg": 24000,
+            "dimensions_source": {"kind": "equipment_plate", "reference": "Plate A-19"},
+        }
+        source = (
+            "item_id,name,length_mm,width_mm,height_mm,weight_kg,quantity,stackable,orientation\n"
+            "BOX,Closed box,400,300,200,12.5,1,true,fixed\n"
+        )
+        submitted = {"cargo_csv": source, "container_id": "custom_dry", "custom_profile_json": json.dumps(profile),
+                     "shipment_reference": "SHIP-1"}
+        response = self.client.post(reverse("upload"), submitted)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["result"]["container"]["status"], "unverified_measured")
+        self.assertEqual(response.context["result"]["container"]["dimensions_source"], profile["dimensions_source"])
+        export = self.client.post(reverse("export-csv"), submitted)
+        row = next(csv.DictReader(io.StringIO(export.content.decode("utf-8"))))
+        self.assertEqual(row["container_id"], "custom_dry")
+        self.assertEqual(row["container_status"], "unverified_measured")
+        self.assertEqual(row["dimensions_source_kind"], "equipment_plate")
+        self.assertEqual(row["dimensions_source_reference"], "Plate A-19")
+
+    def test_invalid_custom_dry_measurements_are_preserved_without_results(self):
+        profile = {
+            "name": "Invalid plate", "inside_mm": {"length": 1000, "width": 1000, "height": 1000},
+            "door_mm": {"width": 1001, "height": 900}, "max_payload_kg": 1000,
+            "dimensions_source": {"kind": "equipment_plate", "reference": "Plate 1"},
+        }
+        response = self.client.post(reverse("upload"), {
+            "cargo_csv": DEMO_CSV, "container_id": "custom_dry", "custom_profile_json": json.dumps(profile),
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "door dimensions cannot exceed")
+        self.assertEqual(response.context["custom_profile_json"], json.dumps(profile))
+        self.assertIsNone(response.context.get("result"))
+        self.assertNotContains(response, 'class="export-form"')
+
+    def test_malformed_custom_profile_kind_and_deep_json_are_safe_validation_errors(self):
+        invalid_kind = json.dumps({
+            "name": "Bad profile", "inside_mm": {"length": 5000, "width": 2200, "height": 2300},
+            "door_mm": {"width": 2100, "height": 2200}, "max_payload_kg": 24000,
+            "dimensions_source": {"kind": [], "reference": "Plate"},
+        })
+        response = self.client.post(reverse("upload"), {
+            "cargo_csv": DEMO_CSV, "container_id": "custom_dry", "custom_profile_json": invalid_kind,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Choose how the custom equipment values were obtained")
+        self.assertIsNone(response.context.get("result"))
+        too_deep_json = "[" * 1020 + "0" + "]" * 1020
+        response = self.client.post(reverse("upload"), {
+            "cargo_csv": DEMO_CSV, "container_id": "custom_dry", "custom_profile_json": too_deep_json,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Custom profile data")
+        self.assertIsNone(response.context.get("result"))
 
     def test_post_shows_conserved_quantity_and_placed_geometry(self):
         response = self.client.post(reverse("upload"), {"cargo_csv": DEMO_CSV})

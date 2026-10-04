@@ -33,7 +33,7 @@ class PackingTests(unittest.TestCase):
         self.assertEqual(result["totals"]["placed_count"], 1)
         self.assertEqual(result["placed"][0]["orientation"], "yaw")
         self.assertEqual(result["placed"][0]["rotation_deg"], 90)
-        self.assertLessEqual(result["placed"][0]["dy"], 2340)
+        self.assertLessEqual(result["placed"][0]["dy"], 2350)
 
     def test_payload_limit_leaves_item_unplaced(self):
         result = pack_items([item("heavy-a", weight=16000), item("heavy-b", weight=16000)])
@@ -41,11 +41,11 @@ class PackingTests(unittest.TestCase):
         self.assertEqual(result["totals"]["placed_weight_kg"], 16000)
 
     def test_payload_boundary_uses_exact_gram_units(self):
-        at_limit = pack_items([item("a", weight=14065.125), item("b", weight=14064.875)])
-        self.assertEqual(at_limit["totals"]["placed_weight_kg"], 28130)
+        at_limit = pack_items([item("a", weight=14100.125), item("b", weight=14099.875)])
+        self.assertEqual(at_limit["totals"]["placed_weight_kg"], 28200)
         self.assertEqual(at_limit["totals"]["unplaced_count"], 0)
-        over_limit = pack_items([item("a", weight=14065.125), item("b", weight=14064.876)])
-        self.assertEqual(over_limit["totals"]["placed_weight_kg"], 14065.125)
+        over_limit = pack_items([item("a", weight=14100.125), item("b", weight=14099.876)])
+        self.assertEqual(over_limit["totals"]["placed_weight_kg"], 14100.125)
         self.assertEqual(over_limit["unplaced"][0]["reason"], "payload_limit")
 
     def test_direct_unit_count_limit(self):
@@ -97,7 +97,7 @@ class PackingTests(unittest.TestCase):
                             and first["y"] < second["y"] + second["dy"] and second["y"] < first["y"] + first["dy"]
                             and first["z"] < second["z"] + second["dz"] and second["z"] < first["z"] + first["dz"])
                 self.assertFalse(overlaps)
-        self.assertLessEqual(result["totals"]["placed_weight_kg"], 28130)
+        self.assertLessEqual(result["totals"]["placed_weight_kg"], 28200)
         original_ids = [str(i) for i in range(12)]
         output_ids = [x["item_id"] for x in result["placed"] + result["unplaced"]]
         self.assertCountEqual(output_ids, original_ids)
@@ -243,6 +243,132 @@ class PackingTests(unittest.TestCase):
             result = pack_items([item("a"), item("b")])
         self.assertEqual(result["totals"]["placed_count"], 1)
         self.assertEqual(result["unplaced"][0]["reason"], "no_feasible_space_found_by_heuristic")
+
+    def test_named_container_profiles_flow_through_geometry_and_payload(self):
+        long_item = item("long", length=6000, width=500, height=500)
+        small = pack_items([long_item], "20std")
+        standard40 = pack_items([long_item], "40std")
+        self.assertEqual(small["container"]["id"], "20std")
+        self.assertEqual(small["unplaced"][0]["reason"], "door_or_container_dimensions")
+        self.assertEqual(standard40["placed"][0]["item_id"], "long")
+        self.assertEqual(standard40["container"]["inside_mm"]["length"], 12032)
+        self.assertEqual(standard40["container"]["status"], "supported_packing")
+
+        high = pack_items([item("tall", length=1000, width=500, height=2500)], "40hc")
+        dry40 = pack_items([item("tall", length=1000, width=500, height=2500)], "40std")
+        self.assertEqual(high["totals"]["placed_count"], 1)
+        self.assertEqual(dry40["unplaced"][0]["reason"], "door_or_container_dimensions")
+        self.assertEqual(pack_items([item("payload", weight=28500)], "20std")["unplaced"][0]["reason"], "payload_limit")
+        self.assertEqual(pack_items([item("payload", weight=28500)], "40std")["totals"]["placed_count"], 1)
+
+    def test_exact_door_width_fits_but_one_mm_over_does_not(self):
+        exact = pack_items([item("exact", length=1000, width=2350, height=100)])
+        over = pack_items([item("over", length=1000, width=2351, height=100)])
+        self.assertEqual(exact["totals"]["placed_count"], 1)
+        self.assertEqual(over["unplaced"][0]["reason"], "door_or_container_dimensions")
+
+    def test_floor_only_placement_stays_on_floor_and_can_independently_support(self):
+        result = pack_items([
+            item("a-floor", length=1000, width=1000, height=300, stackable=True),
+            {**item("b-floor-only", length=500, width=500, height=200), "floor_only": True},
+            {**item("c-top", length=500, width=500, height=100), "floor_only": False},
+        ])
+        by_id = {cargo["item_id"]: cargo for cargo in result["placed"]}
+        self.assertEqual(by_id["b-floor-only"]["z"], 0)
+
+        floor_support = pack_items([
+            {**item("a-floor-base", length=5896, width=2350, height=300, stackable=True), "floor_only": True},
+            item("b-top", length=500, width=500, height=100),
+        ])
+        by_id = {cargo["item_id"]: cargo for cargo in floor_support["placed"]}
+        self.assertEqual(by_id["a-floor-base"]["z"], 0)
+        self.assertEqual(by_id["b-top"]["z"], by_id["a-floor-base"]["dz"])
+
+    def test_floor_only_no_floor_space_has_explicit_heuristic_reason(self):
+        result = pack_items([
+            item("base", length=5896, width=2350, height=1000),
+            {**item("floor-only", length=1000, width=1000, height=100), "floor_only": True},
+        ])
+        self.assertEqual(result["unplaced"][0]["item_id"], "floor-only")
+        self.assertEqual(result["unplaced"][0]["reason"], "floor_only_no_floor_space")
+
+    def test_legacy_csv_defaults_optional_cargo_metadata(self):
+        legacy = parse_csv(DEMO_CSV)
+        self.assertEqual(legacy[0]["load_unit_type"], "carton_crate")
+        self.assertFalse(legacy[0]["floor_only"])
+        self.assertFalse(legacy[0]["is_dg"])
+        self.assertEqual(legacy[0]["un_number"], "")
+
+    def test_load_unit_types_optional_flags_and_manual_dg_hold_expand(self):
+        header = ("item_id,name,length_mm,width_mm,height_mm,weight_kg,quantity,stackable,orientation,"
+                  "load_unit_type,floor_only,is_dg,un_number,imdg_class,packing_group")
+        source = (header + "\nDANGER,Drums,100,100,100,2.5,2,true,yaw,drum_roll,false,true,UN1993,3,II\n"
+                  "PAL,Pallet,1000,800,1200,50,1,false,fixed,palletized,true,false,,,\n")
+        items = parse_csv(source)
+        self.assertEqual([row["load_unit_type"] for row in items], ["drum_roll", "drum_roll", "palletized"])
+        self.assertEqual([row["un_number"] for row in items[:2]], ["UN1993", "UN1993"])
+        result = pack_items(items, "40std")
+        held = [row for row in result["unplaced"] if row["reason"] == "manual_compliance_hold"]
+        self.assertEqual(len(held), 2)
+        self.assertTrue(all(row["is_dg"] and row["imdg_class"] == "3" and row["packing_group"] == "II" for row in held))
+        self.assertTrue(all(row["load_unit_type"] == "palletized" for row in result["placed"]))
+        self.assertEqual(result["readiness"], "manual_compliance_hold")
+        self.assertEqual(result["totals"]["manual_compliance_hold_count"], 2)
+        self.assertEqual(result["totals"]["input_count"], 3)
+
+    def test_dg_hold_precedes_payload_and_dimension_reasons(self):
+        dg = {**item("dg", length=100000, width=50000, height=10000, weight=1e308), "is_dg": True, "un_number": "UN0001"}
+        result = pack_items([dg])
+        self.assertEqual(result["placed"], [])
+        self.assertEqual(result["unplaced"][0]["reason"], "manual_compliance_hold")
+        self.assertEqual(result["readiness"], "manual_compliance_hold")
+
+    def test_dg_metadata_without_flag_is_rejected_in_csv_and_direct_items(self):
+        header = ("item_id,name,length_mm,width_mm,height_mm,weight_kg,quantity,stackable,orientation,"
+                  "is_dg,un_number")
+        with self.assertRaisesRegex(ValueError, "requires is_dg=true"):
+            parse_csv(header + "\na,A,10,10,10,1,1,true,fixed,false,UN0001\n")
+        with self.assertRaisesRegex(ValueError, "requires is_dg=true"):
+            pack_items([{**item("a"), "un_number": "UN0001"}])
+
+    def test_optional_columns_validate_explicit_boolean_and_load_unit_type(self):
+        header = ("item_id,name,length_mm,width_mm,height_mm,weight_kg,quantity,stackable,orientation,"
+                  "floor_only,is_dg,load_unit_type")
+        with self.assertRaisesRegex(ValueError, "floor_only"):
+            parse_csv(header + "\na,A,10,10,10,1,1,true,fixed,,false,carton_crate\n")
+        with self.assertRaisesRegex(ValueError, "load_unit_type"):
+            parse_csv(header + "\na,A,10,10,10,1,1,true,fixed,false,false,reefer\n")
+
+    def test_custom_measured_dry_container_is_bounded_and_unverified(self):
+        profile = {
+            "name": "My measured box", "inside_mm": {"length": 6000, "width": 2400, "height": 2500},
+            "door_mm": {"width": 2300, "height": 2200}, "max_payload_kg": 20000,
+            "dimensions_source": {"kind": "equipment_plate", "reference": "Unit plate noted 2026-10-04"},
+        }
+        result = pack_items([item("a", length=1000, width=500, height=100)], "custom_dry", custom_profile=profile)
+        self.assertEqual(result["container"]["id"], "custom_dry")
+        self.assertEqual(result["container"]["status"], "unverified_measured")
+        self.assertEqual(result["container"]["dimensions_source"], profile["dimensions_source"])
+        self.assertEqual(result["placed"][0]["item_id"], "a")
+        self.assertEqual(pack_items([item("heavy", weight=20000.001)], "custom_dry", custom_profile=profile)["unplaced"][0]["reason"], "payload_limit")
+        for invalid in (
+            {**profile, "door_mm": {"width": 2401, "height": 2200}},
+            {**profile, "inside_mm": {"length": -1, "width": 2400, "height": 2500}},
+            {**profile, "dimensions_source": {"kind": "made_up", "reference": "x"}},
+            {**profile, "dimensions_source": {"kind": "user_measurement", "reference": ""}},
+            {**profile, "family": "trailer"},
+            {**profile, "max_payload_kg": 1_000_001},
+        ):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                pack_items([item("a")], "custom_dry", custom_profile=invalid)
+        with self.assertRaisesRegex(ValueError, "required"):
+            pack_items([item("a")], "custom_dry")
+        with self.assertRaisesRegex(ValueError, "only be supplied"):
+            pack_items([item("a")], "20std", custom_profile=profile)
+
+    def test_unknown_container_id_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "unsupported container_id"):
+            pack_items([item("a")], "reefer")
 
 
 if __name__ == "__main__":
