@@ -32,7 +32,7 @@ python manage.py check --settings=dcd_project.settings_demo
 python manage.py test optimization.test_mvp_views optimization.test_packing optimization.test_tracking optimization.test_render_deploy --settings=dcd_project.settings_demo
 ```
 
-This branch is a local review candidate. No live service deployment or database connection is part of the demo.
+This project remains stateless and has no application database or session history. The source was later released on the existing Render Free service; the latest release record and exact source SHA are listed below.
 
 The included browser smoke script exercises manual rows, exact unit conversion, Excel paste, CSV loading/validation, placement and remaining-item details, SVG/table ID parity, row-to-box selection, cargo-fit/full-container camera modes, immutable CSV/JSON exports, and a mocked forecast UI response (no upstream request). It checks the initial desktop first fold and 375 px layout for document-level horizontal overflow, then writes initial, packed desktop, and mobile screenshots. It needs a local Playwright package and Chrome; provide an absolute desktop screenshot path, for example `node scripts/browser-smoke.cjs C:\\temp\\cargo-fit-planner-desktop.png`.
 
@@ -41,6 +41,10 @@ The included browser smoke script exercises manual rows, exact unit conversion, 
 The optional marine form makes an on-demand request only for coordinates entered by the user; it does not identify a vessel or infer its location. Forecast values, requested coordinates, provider grid coordinates, model-valid time, retrieval time, and linked model attribution are displayed separately. Unknown measurements remain unknown. The upstream adapter uses a fixed HTTPS Open-Meteo Marine API endpoint, no credentials, no redirects or retries, a 64 KiB response cap, and a 5-second socket-inactivity timeout (not a strict wall-clock deadline). It uses a process-local 10-minute/32-coordinate cache, a 60-second interval between upstream requests, and a 200-attempt UTC-day budget. These bounds reset on process restart and across multiple workers; they are not a durable quota or service-level guarantee. The feature is for user-confirmed noncommercial educational use under the provider's current API terms. CC BY 4.0 attribution is a separate data-license requirement; attribution links appear with each forecast.
 
 AIS has no active feed or positions. A future server-side integration would require a provider key and compliance with its then-current service and display terms. The UI links to [AISStream's documentation](https://aisstream.io/documentation/) for research context; no AIS connection or credential is configured.
+
+## Live release status — 2026-10-04
+
+The existing `cargo-fit-planner` Render Free service is live from commit `e7120f2092abd3a061ed8061a595f566d82cbe79`. The optional noncommercial marine forecast switch is enabled for the user's confirmed educational portfolio use. The service remains a single stateless instance with no database, disk, or background service. This release does not establish a hard billing cap or promise uptime; see the dated delivery evidence for its bounded live checks and limitations.
 
 ## Render deployment path
 
