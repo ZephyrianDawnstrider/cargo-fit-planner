@@ -6,12 +6,14 @@ import json
 import threading
 from decimal import Decimal
 
+from django.conf import settings
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from .packing import CSV_TEMPLATE, DEMO_CSV, CsvValidationError, pack_items, parse_csv
+from .tracking import TrackingError, get_ais_status, get_marine_forecast
 
 
 MAX_CSV_BYTES = 256 * 1024
@@ -46,7 +48,12 @@ def _safe_csv_row(row):
 @require_http_methods(["GET", "POST"])
 @never_cache
 def index(request):
-    context = {"csv_template": CSV_TEMPLATE, "demo_csv": DEMO_CSV}
+    context = {
+        "csv_template": CSV_TEMPLATE,
+        "demo_csv": DEMO_CSV,
+        "weather_enabled": getattr(settings, "WEATHER_FREE_API_ENABLED", False),
+        "ais_status": get_ais_status(),
+    }
     if request.method == "POST":
         if not _COMPUTE_SLOT.acquire(blocking=False):
             return _busy_response()
@@ -156,3 +163,23 @@ def demo_csv(request):
 @require_GET
 def healthz(request):
     return HttpResponse("ok\n", content_type="text/plain; charset=utf-8")
+
+
+@require_POST
+@never_cache
+def marine_forecast(request):
+    from django.http import JsonResponse
+
+    if not getattr(settings, "WEATHER_FREE_API_ENABLED", False):
+        response = JsonResponse({"error": {"code": "weather_disabled", "message": "The educational marine forecast is not enabled on this deployment."}}, status=503)
+    else:
+        try:
+            latitude = request.POST.get("latitude", "")
+            longitude = request.POST.get("longitude", "")
+            result = get_marine_forecast(latitude, longitude)
+        except TrackingError as exc:
+            response = JsonResponse({"error": {"code": exc.code, "message": exc.message}}, status=exc.status)
+        else:
+            response = JsonResponse(result)
+    response["Cache-Control"] = "no-store"
+    return response

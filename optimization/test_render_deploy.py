@@ -23,6 +23,7 @@ class RenderDeploymentSettingsTests(SimpleTestCase):
         env = {
             "SECRET_KEY": "s" * 64,
             "RENDER_EXTERNAL_HOSTNAME": "cargo-fit-planner.onrender.com",
+            "CARGO_WEATHER_FREE_API_ENABLED": "",
         }
         with patch.dict(os.environ, env, clear=False):
             module = importlib.import_module("dcd_project.settings_render")
@@ -32,6 +33,7 @@ class RenderDeploymentSettingsTests(SimpleTestCase):
         self.assertEqual(module.INSTALLED_APPS, [])
         self.assertNotIn("django.contrib.sessions.middleware.SessionMiddleware", module.MIDDLEWARE)
         self.assertNotIn("optimization.routers", module.DATABASE_ROUTERS)
+        self.assertFalse(module.WEATHER_FREE_API_ENABLED)
         self.assertTrue(module.CSRF_COOKIE_SECURE)
         self.assertTrue(module.SECURE_SSL_REDIRECT)
         self.assertLess(module.MIDDLEWARE.index("optimization.admission.ComputeRateLimitMiddleware"), module.MIDDLEWARE.index("django.middleware.csrf.CsrfViewMiddleware"))
@@ -83,27 +85,32 @@ class RenderDeploymentSettingsTests(SimpleTestCase):
         self.assertNotIn("optimization/models.py", staged)
         code = (
             "import importlib.util, pathlib, dcd_project.settings_render as s, "
-            "optimization.mvp_views as v; root=pathlib.Path.cwd().resolve(); "
+            "optimization.mvp_views as v, optimization.tracking as t; root=pathlib.Path.cwd().resolve(); "
             "assert pathlib.Path(s.__file__).resolve().is_relative_to(root); "
             "assert pathlib.Path(v.__file__).resolve().is_relative_to(root); "
+            "assert pathlib.Path(t.__file__).resolve().is_relative_to(root); "
             "assert importlib.util.find_spec('optimization.models') is None"
         )
         env = os.environ.copy()
-        env.update({"SECRET_KEY": "s" * 64, "RENDER_EXTERNAL_HOSTNAME": "cargo-fit-planner.onrender.com", "PYTHONPATH": ".", "PYTHONDONTWRITEBYTECODE": "1", "DJANGO_SETTINGS_MODULE": "dcd_project.settings_render"})
+        env.update({"SECRET_KEY": "s" * 64, "RENDER_EXTERNAL_HOSTNAME": "cargo-fit-planner.onrender.com", "CARGO_WEATHER_FREE_API_ENABLED": "true", "PYTHONPATH": ".", "PYTHONDONTWRITEBYTECODE": "1", "DJANGO_SETTINGS_MODULE": "dcd_project.settings_render"})
         child = subprocess.run([sys.executable, "-c", code], cwd=TARGET, env=env, capture_output=True, text=True, timeout=15)
         self.assertEqual(child.returncode, 0, child.stderr)
         flow = (
-            "import dcd_project.wsgi_render; from django.test import Client; from optimization.packing import DEMO_CSV; "
+            "import dcd_project.wsgi_render; from django.test import Client; from unittest.mock import patch; from optimization.packing import DEMO_CSV; "
             "c=Client(HTTP_HOST='cargo-fit-planner.onrender.com'); "
             "h=c.get('/healthz'); assert h.status_code==200 and h.content==b'ok\\n'; "
             "p=c.post('/', {'cargo_csv':DEMO_CSV}, secure=True); assert p.status_code==200 and b'BOX-001' in p.content; "
             "csv=c.post('/export/csv/', {'cargo_csv':DEMO_CSV}, secure=True); assert csv.status_code==200 and b'BOX-001' in csv.content and 'no-store' in csv['Cache-Control']; "
             "js=c.post('/export/json/', {'cargo_csv':DEMO_CSV}, secure=True); assert js.status_code==200 and b'BOX-001' in js.content and 'no-store' in js['Cache-Control']; "
-            "print('health=200 pack=200 csv=200 json=200')"
+            "fixture={'status':'forecast','requested_coordinates':{'latitude':1,'longitude':2}}; "
+            "weather_mock=patch('optimization.mvp_views.get_marine_forecast', return_value=fixture); weather_mock.start(); "
+            "w=c.post('/weather/', {'latitude':'1','longitude':'2'}, secure=True); weather_mock.stop(); "
+            "assert w.status_code==200 and w.json()==fixture and 'no-store' in w['Cache-Control']; "
+            "print('health=200 pack=200 csv=200 json=200 weather=200 mocked')"
         )
         flow_result = subprocess.run([sys.executable, "-c", flow], cwd=TARGET, env=env, capture_output=True, text=True, timeout=15)
         self.assertEqual(flow_result.returncode, 0, flow_result.stderr)
-        self.assertIn("health=200 pack=200 csv=200 json=200", flow_result.stdout)
+        self.assertIn("health=200 pack=200 csv=200 json=200 weather=200 mocked", flow_result.stdout)
         self.assertFalse((TARGET / "db.sqlite3").exists())
 
 
@@ -153,3 +160,12 @@ class ComputeRateLimitTests(SimpleTestCase):
         # a small form-name/CSRF allowance in the configured raw-body cap.
         encoded_body_bound = max_csv_bytes * 3 + 2048
         self.assertLessEqual(encoded_body_bound, ComputeRateLimitMiddleware.MAX_REQUEST_BYTES)
+
+    def test_weather_posts_share_bounded_ingress_bucket_and_body_cap(self):
+        for _ in range(ComputeRateLimitMiddleware.CAPACITY):
+            self.assertEqual(self.middleware(self.factory.post("/weather/", data={"latitude": "1"})).status_code, 200)
+        limited = self.middleware(self.factory.post("/weather/", data={"latitude": "1"}))
+        self.assertEqual(limited.status_code, 429)
+        oversized = self.factory.post("/weather/", data={"latitude": "1"})
+        oversized.META["CONTENT_LENGTH"] = str(ComputeRateLimitMiddleware.MAX_REQUEST_BYTES + 1)
+        self.assertEqual(self.middleware(oversized).status_code, 413)

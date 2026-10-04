@@ -9,7 +9,7 @@ from django.http import HttpResponse
 
 
 class ComputeRateLimitMiddleware:
-    """Allow a small burst, then at most one compute/export POST per 10 seconds.
+    """Allow a small burst, then at most one bounded POST per 10 seconds.
 
     State is process-local and intentionally independent of client-supplied IPs,
     cookies, and forwarded headers. Render runs this MVP with one instance.
@@ -20,7 +20,7 @@ class ComputeRateLimitMiddleware:
     # Maximal percent-encoding can triple each decoded UTF-8 byte; 800 KiB
     # leaves room for a parser-valid 256 KiB CSV plus form fields/boundaries.
     MAX_REQUEST_BYTES = 800 * 1024
-    PATHS = {"/", "/export/csv/", "/export/json/"}
+    PATHS = {"/", "/export/csv/", "/export/json/", "/weather/"}
 
     _lock = threading.Lock()
     _tokens = float(CAPACITY)

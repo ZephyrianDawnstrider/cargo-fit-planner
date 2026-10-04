@@ -14,6 +14,7 @@
     .panel { min-width: 0; background: white; border: 1px solid #dce3e9; border-radius: 12px; padding: 20px; margin: 16px 0; box-shadow: 0 4px 14px #2034480a; }
     .toolbar, .metrics { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
     textarea { width: 100%; min-height: 176px; padding: 12px; border: 1px solid #bdc9d4; border-radius: 8px; font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    input, select { border: 1px solid #bdc9d4; border-radius: 6px; padding: 7px; font: inherit; } #cargo-editor input { min-width: 82px; width: 100%; } #cargo-editor input[data-field="name"] { min-width: 150px; } #cargo-editor input[data-field="item_id"] { min-width: 105px; } #cargo-editor input[type="checkbox"] { width: auto; min-width: 0; }
     button, .button { border: 0; border-radius: 7px; background: #126c84; color: white; padding: 10px 15px; font-weight: 650; text-decoration: none; cursor: pointer; }
     button.secondary, .button.secondary { color: #18445b; background: #e8f1f5; } .note, small { color: #546473; }
     .error { color: #8c1c13; background: #fff1ef; border: 1px solid #ffc7c0; border-radius: 8px; padding: 12px; }
@@ -23,7 +24,9 @@
     :focus-visible { outline: 3px solid #d27600; outline-offset: 2px; }
     .metrics { margin: 14px 0; } .metric { min-width: 145px; flex: 1; background: #f4f7f9; border-radius: 8px; padding: 12px; }
     .metric strong { display: block; font-size: 22px; } .metric span { color: #596b79; font-size: 12px; }
-    .layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(290px, .65fr); gap: 16px; }
+    .workspace { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr); gap: 16px; align-items: start; } .workspace > .panel { margin: 16px 0; }
+    .hero { display:flex; justify-content:space-between; gap:16px; align-items:center; flex-wrap:wrap; margin:14px 0 4px; padding:14px 18px; color:#17394a; background:#e7f1f4; border-left:4px solid #2a8994; border-radius:8px; } .hero strong { display:block; } .hero span { color:#536b78; font-size:13px; }
+    .layout { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 16px; align-items:start; }
     .scene-wrap { overflow: hidden; min-height: 355px; background: radial-gradient(ellipse at 50% 45%,#fff,#eaf0f4); border-radius: 9px; display: grid; place-items: center; }
     .scene { width: 100%; height: auto; max-height: 390px; }
     .floor { fill: #e8eff3; stroke: #657b89; stroke-width: 2; }
@@ -31,62 +34,92 @@
     .box-label { font: 11px ui-monospace, monospace; fill: #122b36; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
     .axis { font: 12px ui-sans-serif, system-ui; fill: #344b59; font-weight: 700; }
     .subtle { font-size: 12px; color: #61717e; } .scroll { max-width: 100%; overflow-x: auto; overflow-y: auto; max-height: 380px; }
+    .scene-wrap { min-height: 250px; } .scene { max-height: 290px; }
+    .empty-preview { min-height: 145px; margin: 12px 0; } .empty-preview .scene { max-height: 165px; }
     input[type="file"] { max-width: 100%; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; } th,td { text-align: left; padding: 8px 9px; border-bottom: 1px solid #e6ebef; white-space: nowrap; } th { background: #f5f8fa; position: sticky; top: 0; }
     .badge { display: inline-block; border-radius: 99px; padding: 2px 8px; font-size: 11px; font-weight: 700; } .placed { color: #155b3c; background: #e3f5eb; } .unplaced { color: #8b4410; background: #fff0db; }
     .limitations { color: #566572; font-size: 13px; } .limitations li { margin: 4px 0; }
-    @media(max-width:800px) { .layout { grid-template-columns: minmax(0, 1fr); } header { padding: 24px; } main { margin-top: 16px; } }
+    .paste-panel { margin: 14px 0; padding: 14px; border: 1px solid #dce3e9; border-radius: 9px; background: #f8fafb; } .paste-panel h3 { margin: 0 0 6px; } summary { cursor: pointer; color: #18445b; font-weight: 700; } details { margin-top: 18px; padding-top: 12px; border-top: 1px solid #e6ebef; }
+    @media(max-width:800px) { .workspace,.layout { grid-template-columns: minmax(0, 1fr); } header { padding: 20px; } main { margin-top: 12px; padding:0 12px 28px; } .panel { padding:15px; } .scene-wrap { min-height:235px; } }
+    #cargo-editor { display:block; width:100%; } #cargo-editor thead { display:none; } #cargo-rows { display:grid; grid-template-columns:minmax(0,1fr); gap:9px; } #cargo-rows tr { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:2px; border:1px solid #dce3e9; border-radius:8px; padding:6px; background:#fbfcfd; min-width:0; } #cargo-rows td { display:flex; min-width:0; flex-direction:column; white-space:normal; padding:5px; border:0; } #cargo-rows td::before { content:attr(data-label); color:#596b79; font-size:11px; font-weight:700; } #cargo-rows td:first-child { grid-column:1/-1; flex-direction:row; justify-content:flex-end; } #cargo-rows td:first-child::before { content:""; } #cargo-rows input { min-width:0!important; width:100%; } #cargo-rows input[type="checkbox"] { width:auto; }
+    @media(max-width:600px) { #cargo-rows { grid-template-columns:1fr; } #cargo-rows tr { grid-template-columns:repeat(2,minmax(0,1fr)); } .primary-metrics .metric { min-width:90px; } }
   </style>
 </head>
 <body>
-<header><h1>Cargo Fit Planner</h1><p>Deterministic single-container placement preview · dimensions in millimetres · weights in kilograms</p></header>
+<header><h1>Cargo Fit Planner</h1><p>Plan a container load from cargo you enter or paste · dimensions in millimetres · weights in kilograms</p></header>
 <main>
-  <section class="panel">
-    <h2>1. Add cargo</h2>
-    <p class="note">CSV is limited to 256 KiB, 100 source rows, and 100 expanded items. Dimensions use whole millimetres; weights use kilograms to 0.001 kg. After packing, exports match the displayed result; repack after making edits. Cost estimates are not included.</p>
-    <div class="toolbar"><a class="button secondary" href="{% url 'cargo-template' %}">Download CSV template</a><button class="secondary" type="button" id="load-demo">Load synthetic example</button></div>
-    {% if error %}<div class="error" role="alert"><h3>Could not pack this CSV</h3><p>{{ error }}</p></div>{% endif %}
-    {% if validation_errors %}<div class="error" role="alert" aria-labelledby="validation-title"><h3 id="validation-title">Fix the CSV rows below</h3><ul>{% for issue in validation_errors %}<li>{% if issue.row %}Row {{ issue.row }} · {% else %}CSV · {% endif %}{% if issue.field %}{{ issue.field }}: {% endif %}{{ issue.message }}</li>{% endfor %}</ul>{% if validation_errors_truncated %}<p>Only the first 20 errors are shown. Correct these entries and submit again to check for more.</p>{% endif %}</div>{% endif %}
-    <form method="post" id="cargo-form">{% csrf_token %}
-      <label for="cargo-csv"><strong>Cargo CSV</strong></label>
+  <div class="hero"><div><strong>One-container feasibility preview</strong><span>Enter a manifest, review placements, then export your result.</span></div><div><strong>20 ft standard example</strong><span>5900 × 2352 × 2395 mm inside · 28,130 kg payload · <a href="https://www.hapag-lloyd.com/en/services-information/cargo-fleet/container/20-standard.html" target="_blank" rel="noopener">profile details</a></span></div></div>
+  <div class="workspace">
+  <section class="panel entry-panel">
+    <h2>1. Enter cargo</h2>
+    <p class="note">Add items one per row, or paste tab-separated rows copied from Excel. Dimensions convert to whole millimetres; weight stays in kilograms at 0.001 kg precision. Up to 100 expanded units per pack.</p>
+    <div class="toolbar"><button class="secondary" type="button" id="load-demo">Load sample cargo</button><a class="button secondary" href="{% url 'cargo-template' %}">CSV template</a><label for="dimension-unit">Dimension entry unit</label><select id="dimension-unit"><option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option></select></div>
+    <p class="subtle">Excel columns, in order: Item ID, name, length, width, height, weight (kg), quantity, stackable (true/false), orientation (fixed/yaw).</p>
+    <div class="scroll editor-scroll" tabindex="0" aria-label="Editable cargo rows; scroll horizontally if needed">
+      <table id="cargo-editor"><thead><tr><th>Row</th><th>Item ID</th><th>Name</th><th>Length</th><th>Width</th><th>Height</th><th>Weight kg</th><th>Qty</th><th>Can support cargo above</th><th>Orientation</th></tr></thead><tbody id="cargo-rows"></tbody></table>
+    </div>
+    <div class="toolbar" style="margin-top:12px"><button class="secondary" type="button" id="add-row">Add item row</button><button class="secondary" type="button" id="toggle-paste">Paste Excel rows</button><button type="submit" form="cargo-form">Pack cargo</button></div>
+    <section id="paste-panel" class="paste-panel" hidden aria-labelledby="paste-title"><h3 id="paste-title">Paste spreadsheet rows</h3><p class="subtle">Copy cells from Excel in the column order shown above, then paste them here. The first line may be a header. Values use the selected dimension unit and kg.</p><label for="excel-paste">Tab-separated rows</label><textarea id="excel-paste" rows="5" placeholder="CRATE&#9;Wooden crate&#9;90&#9;70&#9;80&#9;220&#9;1&#9;false&#9;fixed"></textarea><div class="toolbar"><button class="secondary" type="button" id="apply-paste">Add pasted rows</button><button class="secondary" type="button" id="cancel-paste">Close</button></div><p id="paste-feedback" class="subtle" aria-live="polite"></p></section>
+    <p id="manual-feedback" class="error" role="alert" hidden></p>
+    <form method="post" id="cargo-form">{% csrf_token %}<input type="hidden" name="cargo_csv" id="cargo-csv" value="{{ cargo_csv|escape }}"><input type="hidden" id="source-mode" value="manual"></form>
+    <details id="csv-tools"><summary>Import or edit CSV instead</summary>
+      <p class="note">CSV is limited to 256 KiB, 100 source rows, and 100 expanded items. After packing, exports match the submitted snapshot; repack after making edits.</p>
       <p><label for="csv-file">Load a CSV file into the editor</label><br><input id="csv-file" type="file" accept=".csv,text/csv" aria-describedby="upload-feedback"></p>
       <p id="upload-feedback" class="subtle" aria-live="polite"></p>
-      <textarea id="cargo-csv" name="cargo_csv" spellcheck="false" required aria-describedby="csv-help upload-feedback{% if validation_errors %} validation-title{% endif %}" {% if validation_errors %}aria-invalid="true"{% endif %}>{{ cargo_csv|default:'' }}</textarea>
-      <div class="toolbar" style="margin-top:12px"><button type="submit">Pack cargo</button><span class="subtle">Supported orientation: fixed or yaw rotation. A box can support cargo above it only when its stackable flag is true.</span></div>
-    </form>
+      <label for="csv-editor"><strong>Cargo CSV</strong></label>
+      <textarea id="csv-editor" spellcheck="false" aria-describedby="csv-help upload-feedback{% if validation_errors %} validation-title{% endif %}" {% if validation_errors %}aria-invalid="true"{% endif %}>{{ cargo_csv|default:'' }}</textarea>
+      <div class="toolbar" style="margin-top:10px"><button type="button" class="secondary" id="load-csv-rows">Load CSV into item rows</button><button type="button" class="secondary" id="load-demo-csv">Load sample CSV</button><span id="csv-mode-feedback" class="subtle" aria-live="polite"></span></div>
+      <span id="csv-help" class="subtle">Required columns: item_id,name,length_mm,width_mm,height_mm,weight_kg,quantity,stackable,orientation.</span>
+    </details>
+    {% if error %}<div class="error" role="alert"><h3>Could not pack this cargo</h3><p>{{ error }}</p></div>{% endif %}
+    {% if validation_errors %}<div class="error" role="alert" aria-labelledby="validation-title"><h3 id="validation-title">Fix the CSV rows below</h3><ul>{% for issue in validation_errors %}<li>{% if issue.row %}Row {{ issue.row }} · {% else %}CSV · {% endif %}{% if issue.field %}{{ issue.field }}: {% endif %}{{ issue.message }}</li>{% endfor %}</ul>{% if validation_errors_truncated %}<p>Only the first 20 errors are shown. Correct these entries and submit again to check for more.</p>{% endif %}</div>{% endif %}
   </section>
-  {{ demo_csv|json_script:"demo-csv" }}
-
   {% if result %}
-  <section class="panel">
-    <h2>2. Packing result · {{ result.container.name }}</h2>
-    <div class="metrics">
-      <div class="metric"><strong>{{ source_row_count }}</strong><span>source rows</span></div>
-      <div class="metric"><strong>{{ result.totals.input_count }}</strong><span>expanded input units</span></div>
+  <aside class="panel result-sidebar" aria-labelledby="result-title">
+    <h2 id="result-title">2. Packing result · {{ result.container.name }}</h2>
+    <div class="metrics primary-metrics">
+      <div class="metric"><strong>{{ result.totals.input_count }}</strong><span>expanded input</span></div>
       <div class="metric"><strong>{{ result.totals.placed_count }}</strong><span>placed</span></div>
       <div class="metric"><strong>{{ result.totals.unplaced_count }}</strong><span>remaining</span></div>
-      <div class="metric"><strong>{{ input_weight_display }} kg</strong><span>input weight</span></div>
-      <div class="metric"><strong>{{ placed_weight_display }} kg</strong><span>placed weight</span></div>
-      <div class="metric"><strong>{{ remaining_weight_display }} kg</strong><span>remaining weight</span></div>
-      <div class="metric"><strong>{{ result.totals.placed_volume_m3|floatformat:2 }} m³</strong><span>placed volume</span></div>
-      <div class="metric"><strong>{{ payload_utilization_pct|floatformat:1 }}%</strong><span>placed weight ÷ payload limit</span></div>
-      <div class="metric"><strong>{{ volume_utilization_pct|floatformat:1 }}%</strong><span>placed box volume ÷ internal volume</span></div>
     </div>
-    <p class="note">These are capacity ratios only. The volume ratio does not account for gaps, orientation, support rules, or loading access; neither ratio predicts whether additional cargo will fit.</p>
-    <p class="note">Container internal dimensions: {{ result.container.inside_mm.length }} × {{ result.container.inside_mm.width }} × {{ result.container.inside_mm.height }} mm · door: {{ result.container.door_mm.width }} × {{ result.container.door_mm.height }} mm · payload limit: {{ result.container.max_payload_kg }} kg · <a href="{{ result.container.source_url }}" target="_blank" rel="noopener">profile source</a> (checked {{ result.container.source_checked }})</p>
-    <div class="toolbar">
+    <details class="capacity-details"><summary>Capacity, weight and container details</summary><div class="metrics secondary-metrics">
+      <div class="metric"><strong>{{ source_row_count }}</strong><span>source rows</span></div><div class="metric"><strong>{{ input_weight_display }} kg</strong><span>input weight</span></div><div class="metric"><strong>{{ placed_weight_display }} kg</strong><span>placed weight</span></div><div class="metric"><strong>{{ remaining_weight_display }} kg</strong><span>remaining weight</span></div><div class="metric"><strong>{{ result.totals.placed_volume_m3|floatformat:2 }} m³</strong><span>placed volume</span></div><div class="metric"><strong>{{ payload_utilization_pct|floatformat:1 }}%</strong><span>weight ÷ payload limit</span></div><div class="metric"><strong>{{ volume_utilization_pct|floatformat:1 }}%</strong><span>placed volume ÷ inside volume</span></div>
+    </div><p class="subtle">Ratios describe capacity only and do not predict fit. Inside {{ result.container.inside_mm.length }} × {{ result.container.inside_mm.width }} × {{ result.container.inside_mm.height }} mm; door {{ result.container.door_mm.width }} × {{ result.container.door_mm.height }} mm; payload {{ result.container.max_payload_kg }} kg. <a href="{{ result.container.source_url }}" target="_blank" rel="noopener">Profile source</a> (checked {{ result.container.source_checked }}).</p></details>
+    <h3 class="preview-title">3D placement preview</h3><div class="toolbar"><span id="rendered-count" class="subtle" aria-live="polite"></span><button id="toggle-scene-scale" class="secondary" type="button">Show full container</button><button id="rotate-scene" class="secondary" type="button">Change view angle</button></div><p id="scene-mode-note" class="subtle">Fit cargo view · floor cropped to loaded cargo; coordinates stay in container millimetres.</p><div class="scene-wrap"><svg id="scene" class="scene" viewBox="0 0 760 370" role="img" aria-labelledby="scene-title scene-description"><title id="scene-title">Three-dimensional cargo placement preview</title><desc id="scene-description">Axis-aligned placed cargo boxes. Use item ID controls in the coordinates table to highlight a box.</desc></svg></div><p id="selection-feedback" class="subtle" aria-live="polite"></p>
+    <div class="toolbar export-toolbar">
       <form method="post" action="{% url 'export-csv' %}" class="export-form">{% csrf_token %}<input type="hidden" name="cargo_csv" value="{{ cargo_csv|escape }}"><button class="secondary">Export item CSV</button></form>
       <form method="post" action="{% url 'export-json' %}" class="export-form">{% csrf_token %}<input type="hidden" name="cargo_csv" value="{{ cargo_csv|escape }}"><button class="secondary">Export packing JSON</button></form>
     </div>
+  </aside>
+  {% else %}
+  <aside class="panel result-sidebar profile-sidebar"><h2>Container profile</h2><p><strong>20 ft standard example</strong></p><p>Internal size: 5900 × 2352 × 2395 mm<br>Door: 2340 × 2292 mm<br>Maximum payload: 28,130 kg</p><div class="scene-wrap empty-preview"><svg class="scene" viewBox="0 0 420 190" role="img" aria-label="Empty isometric container preview"><path d="M110 120 210 65 320 120 220 175Z" fill="#e8eff3" stroke="#55717f" stroke-width="2"/><path d="M110 120V55L210 12V65M210 12 320 65V120M220 175V110L320 65M110 55 220 110 320 65" fill="none" stroke="#55717f" stroke-width="2"/><text x="210" y="188" text-anchor="middle" fill="#536b78" font-size="12">Preview appears after packing</text></svg></div><p class="subtle">One published profile example, not a universal container. This preview does not model lashing, load strength, floor point loads, or loading sequence.</p><a href="https://www.hapag-lloyd.com/en/services-information/cargo-fleet/container/20-standard.html" target="_blank" rel="noopener">Profile source</a></aside>
+  {% endif %}
+  </div>
+  <section class="panel weather-panel" aria-labelledby="weather-title">
+    <h2 id="weather-title">Optional vessel and marine conditions</h2>
+    <p class="note">Weather uses coordinates you enter manually. They are not a vessel position and do not imply route or navigation advice.</p>
+    <div class="layout">
+      <section><h3>Marine forecast</h3>
+        {% if weather_enabled %}<form id="weather-form" method="post" action="{% url 'marine-forecast' %}">{% csrf_token %}<div class="toolbar"><label>Latitude <input name="latitude" inputmode="decimal" required maxlength="16" aria-label="Manual forecast latitude"></label><label>Longitude <input name="longitude" inputmode="decimal" required maxlength="16" aria-label="Manual forecast longitude"></label><button type="submit" id="weather-submit">Get forecast</button></div></form>
+        {% else %}<p class="subtle">The noncommercial educational forecast is disabled in this environment.</p>{% endif %}
+        <p id="weather-feedback" class="subtle" role="status" aria-live="polite">No forecast requested.</p>
+        <dl id="weather-result" hidden><dt>Forecast at coordinates</dt><dd id="weather-requested"></dd><dt>Forecast grid coordinates</dt><dd id="weather-grid"></dd><dt>Model-valid time (UTC)</dt><dd id="weather-valid"></dd><dt>Retrieved (UTC)</dt><dd id="weather-retrieved"></dd><dt>Significant wave height</dt><dd id="weather-height"></dd><dt>Wave period</dt><dd id="weather-period"></dd><dt>Wave direction</dt><dd id="weather-direction"></dd><dt>Data source and model</dt><dd><a id="weather-source" target="_blank" rel="noopener"></a> · <span id="weather-model"></span></dd><dt>Model data attribution</dt><dd><a id="weather-attribution" target="_blank" rel="noopener"></a></dd></dl>
+        <p class="subtle">Forecast data can be incomplete or inaccurate. It is not onboard observation, vessel telemetry, or navigation guidance. Values the provider does not supply remain unknown.</p>
+      </section>
+      <section><h3>AIS vessel tracking</h3><p class="subtle">AIS status: {{ ais_status.status }}. No vessel positions are queried or shown. A future server-side feed requires a provider key and compliance with its current service and display terms. No feed is enabled here. See <a href="https://aisstream.io/documentation/" target="_blank" rel="noopener">AISStream developer docs</a> and <a href="https://aisstream.io/account" target="_blank" rel="noopener">account/key information</a>.</p></section>
+    </div>
+    <p class="subtle">Marine forecast: <a href="https://open-meteo.com/en/docs/marine-weather-api" target="_blank" rel="noopener">Open-Meteo Marine API</a>, with linked model-data attribution, <a href="https://open-meteo.com/en/license" target="_blank" rel="noopener">CC BY 4.0 attribution</a>, and separate <a href="https://open-meteo.com/en/terms" target="_blank" rel="noopener">free API terms for noncommercial use</a>. This application makes a request only when you select Get forecast. The local in-memory limits reset when the process restarts.</p>
   </section>
+  {{ demo_csv|json_script:"demo-csv" }}
+  {% if result %}
   <div class="layout">
-    <section class="panel"><h2>3. Isometric loading view</h2><div class="toolbar"><span id="rendered-count" class="subtle" aria-live="polite"></span><button id="rotate-scene" class="secondary" type="button">Change view angle</button></div><div class="scene-wrap"><svg id="scene" class="scene" viewBox="0 0 760 370" role="img" aria-labelledby="scene-title scene-description"><title id="scene-title">Three-dimensional cargo placement preview</title><desc id="scene-description">Axis-aligned placed cargo boxes. Use the item ID controls in the coordinates table to highlight a box.</desc></svg></div><p class="subtle">Rendered from each placed item's x/y/z position and dx/dy/dz size. Labels match the item IDs in the table.</p><p id="selection-feedback" class="subtle" aria-live="polite"></p></section>
     <section class="panel"><h2>Remaining cargo</h2>
       {% if result.unplaced %}<div class="scroll" tabindex="0" aria-label="Remaining cargo table; scroll horizontally if needed"><table><thead><tr><th>Item ID</th><th>Name</th><th>Size (L × W × H) mm</th><th>Weight</th><th>Reason</th></tr></thead><tbody>{% for item in unplaced_rows %}<tr><td>{{ item.item_id }}</td><td>{{ item.name }}</td><td>{{ item.length_mm }}, {{ item.width_mm }}, {{ item.height_mm }}</td><td>{{ item.weight_display }} kg</td><td>{% if item.reason == 'payload_limit' %}Would exceed payload limit{% elif item.reason == 'door_or_container_dimensions' %}Does not fit through the door or inside the container{% elif item.reason == 'no_feasible_space_found_by_heuristic' %}No position found by this heuristic{% elif item.reason == 'search_budget_exhausted' %}Search limit reached; this heuristic stopped before evaluating this item{% else %}{{ item.reason }}{% endif %}</td></tr>{% endfor %}</tbody></table></div><p class="subtle">Export files retain the machine-readable reason codes.</p>{% else %}<p>All input items were placed.</p>{% endif %}
       <h2 style="margin-top:22px">Supported scope</h2><ul class="limitations"><li>One standard 20 ft container profile with verified published dimensions and payload limit.</li><li>Axis-aligned placement; fixed or yaw orientation only.</li><li>Stackability is a simple cargo flag, not a load-bearing strength model.</li><li>No loading sequence, lashing, point-load, or cargo strength calculations.</li></ul>
     </section>
   </div>
-  <section class="panel"><h2>Placed item coordinates</h2><div class="scroll" tabindex="0" aria-label="Placed cargo coordinates table; scroll horizontally if needed"><table><thead><tr><th>Item ID</th><th>Name</th><th>Position (x, y, z) mm</th><th>Size (dx, dy, dz) mm</th><th>Weight</th><th>Orientation</th></tr></thead><tbody>{% for item in placed_rows %}<tr class="cargo-row" data-item-id="{{ item.item_id }}"><td><button class="item-link" type="button" data-item-id="{{ item.item_id }}" aria-label="Highlight placed item {{ item.item_id }}" aria-pressed="false">{{ item.item_id }}</button></td><td>{{ item.name }}</td><td>{{ item.x }}, {{ item.y }}, {{ item.z }}</td><td>{{ item.dx }}, {{ item.dy }}, {{ item.dz }}</td><td>{{ item.weight_display }} kg</td><td>{{ item.orientation }}</td></tr>{% empty %}<tr><td colspan="6">No cargo placed.</td></tr>{% endfor %}</tbody></table></div></section>
+  <section class="panel"><h2>Placed item coordinates</h2><p class="subtle">On narrow screens, scroll this table horizontally to inspect each item’s complete coordinates and dimensions.</p><div class="scroll" tabindex="0" aria-label="Placed cargo coordinates table; scroll horizontally if needed"><table><thead><tr><th>Item ID</th><th>Name</th><th>Position (x, y, z) mm</th><th>Size (dx, dy, dz) mm</th><th>Weight</th><th>Orientation</th></tr></thead><tbody>{% for item in placed_rows %}<tr class="cargo-row" data-item-id="{{ item.item_id }}"><td><button class="item-link" type="button" data-item-id="{{ item.item_id }}" aria-label="Highlight placed item {{ item.item_id }}" aria-pressed="false">{{ item.item_id }}</button></td><td>{{ item.name }}</td><td>{{ item.x }}, {{ item.y }}, {{ item.z }}</td><td>{{ item.dx }}, {{ item.dy }}, {{ item.dz }}</td><td>{{ item.weight_display }} kg</td><td>{{ item.orientation }}</td></tr>{% empty %}<tr><td colspan="6">No cargo placed.</td></tr>{% endfor %}</tbody></table></div></section>
   {{ result|json_script:"packing-result" }}
   <script>
     const packed = JSON.parse(document.getElementById('packing-result').textContent);
@@ -94,6 +127,7 @@
     const ns = 'http://www.w3.org/2000/svg';
     const inner = packed.container.inside_mm, length = inner.length, width = inner.width, height = inner.height;
     let selectedItemId = null;
+    let fullContainer = false;
     function applySelection() {
       scene.querySelectorAll('.box-face[data-item-id]').forEach(el => el.classList.toggle('is-highlighted', el.dataset.itemId === selectedItemId));
       document.querySelectorAll('.cargo-row[data-item-id]').forEach(el => el.classList.toggle('is-highlighted', el.dataset.itemId === selectedItemId));
@@ -105,12 +139,14 @@
       scene.replaceChildren();
       const title=document.createElementNS(ns,'title'); title.id='scene-title'; title.textContent='Three-dimensional cargo placement preview'; scene.appendChild(title);
       const description=document.createElementNS(ns,'desc'); description.id='scene-description'; description.textContent='Axis-aligned placed cargo boxes. Use an item ID control in the coordinates table to highlight a box.'; scene.appendChild(description);
-      const [vw,vh]=[760,370], theta=angle*Math.PI/180, c=Math.cos(theta), s=Math.sin(theta);
-      const scale=Math.min((vw-100)/((length+width)*c),(vh-64)/((length+width)*s+height));
-      const ox=vw/2-scale*(length-width)*c/2, oy=24+scale*height;
+    const [vw,vh]=[760,370], theta=angle*Math.PI/180, c=Math.cos(theta), s=Math.sin(theta);
+      const bounds=fullContainer?{length,width,height}:{length:Math.max(1,...packed.placed.map(item=>item.x+item.dx)),width:Math.max(1,...packed.placed.map(item=>item.y+item.dy)),height:Math.max(1,...packed.placed.map(item=>item.z+item.dz))};
+      const viewLength=bounds.length,viewWidth=bounds.width,viewHeight=bounds.height;
+      const scale=Math.min((vw-100)/((viewLength+viewWidth)*c),(vh-64)/((viewLength+viewWidth)*s+viewHeight));
+      const ox=vw/2-scale*(viewLength-viewWidth)*c/2, oy=24+scale*viewHeight;
       const pt=(x,y,z)=>[ox+scale*(x-y)*c,oy+scale*((x+y)*s-z)];
       const polygon=(points,cls,fill,id)=>{const el=document.createElementNS(ns,'polygon');el.setAttribute('points',points.map(p=>pt(...p).join(',')).join(' '));el.setAttribute('class',cls);el.setAttribute('fill',fill);if(id){el.setAttribute('data-item-id',id);const title=document.createElementNS(ns,'title');title.textContent=id;el.appendChild(title);}scene.appendChild(el);};
-      polygon([[0,0,0],[length,0,0],[length,width,0],[0,width,0]],'floor','#e8eff3');
+      polygon([[0,0,0],[viewLength,0,0],[viewLength,viewWidth,0],[0,viewWidth,0]],'floor','#e8eff3');
       const faces=[], labels=[];
       const addFace=(points,fill,item_id)=>{const center=points.reduce((acc,p)=>[acc[0]+p[0]/points.length,acc[1]+p[1]/points.length,acc[2]+p[2]/points.length],[0,0,0]);faces.push({points,fill,item_id,depth:center[0]+center[1]+2*s*center[2]});};
       packed.placed.forEach((item,index)=>{
@@ -123,25 +159,54 @@
       });
       faces.sort((a,b)=>a.depth-b.depth).forEach(face=>polygon(face.points,'box-face',face.fill,face.item_id));
       labels.forEach(label=>scene.appendChild(label));
-      const start=pt(0,0,0); [[length,0,0,'X'],[0,width,0,'Y'],[0,0,height,'Z']].forEach(([x,y,z,name])=>{const end=pt(x,y,z),line=document.createElementNS(ns,'line');line.setAttribute('x1',start[0]);line.setAttribute('y1',start[1]);line.setAttribute('x2',end[0]);line.setAttribute('y2',end[1]);line.setAttribute('stroke','#314b59');line.setAttribute('stroke-width','2');scene.appendChild(line);const label=document.createElementNS(ns,'text');label.setAttribute('x',end[0]+5);label.setAttribute('y',end[1]-4);label.setAttribute('class','axis');label.textContent=name;scene.appendChild(label);});
+      const start=pt(0,0,0); [[viewLength,0,0,'X'],[0,viewWidth,0,'Y'],[0,0,viewHeight,'Z']].forEach(([x,y,z,name])=>{const end=pt(x,y,z),line=document.createElementNS(ns,'line');line.setAttribute('x1',start[0]);line.setAttribute('y1',start[1]);line.setAttribute('x2',end[0]);line.setAttribute('y2',end[1]);line.setAttribute('stroke','#314b59');line.setAttribute('stroke-width','2');scene.appendChild(line);const label=document.createElementNS(ns,'text');label.setAttribute('x',end[0]+5);label.setAttribute('y',end[1]-4);label.setAttribute('class','axis');label.textContent=name;scene.appendChild(label);});
       applySelection();
     }
     draw(30);
     const renderedIds=new Set([...scene.querySelectorAll('.box-face[data-item-id]')].map(face=>face.getAttribute('data-item-id')));
     document.getElementById('rendered-count').textContent = `${renderedIds.size} rendered boxes · ${packed.placed.length} placed items`;
     let rotation=30; document.getElementById('rotate-scene').addEventListener('click',()=>{rotation=rotation===30?42:30;draw(rotation);});
+    document.getElementById('toggle-scene-scale').addEventListener('click',event=>{fullContainer=!fullContainer;event.currentTarget.textContent=fullContainer?'Fit loaded cargo':'Show full container';document.getElementById('scene-mode-note').textContent=fullContainer?'Full container view · floor shows the complete internal footprint; item coordinates are unchanged.':'Fit cargo view · floor cropped to loaded cargo; coordinates stay in container millimetres.';draw(rotation);});
   </script>
   {% endif %}
 </main>
+<template id="cargo-row-template"><tr>
+  <td data-label="Row"><button type="button" class="secondary remove-row" aria-label="Remove cargo row">Remove</button></td>
+  <td data-label="Item ID"><input data-field="item_id" aria-label="Item ID"></td><td data-label="Name"><input data-field="name" aria-label="Cargo name"></td>
+  <td data-label="Length"><input data-field="length_mm" aria-label="Length" inputmode="decimal"></td><td data-label="Width"><input data-field="width_mm" aria-label="Width" inputmode="decimal"></td><td data-label="Height"><input data-field="height_mm" aria-label="Height" inputmode="decimal"></td>
+  <td data-label="Weight (kg)"><input data-field="weight_kg" aria-label="Weight in kilograms" inputmode="decimal"></td><td data-label="Quantity"><input data-field="quantity" aria-label="Quantity" inputmode="numeric" value="1"></td>
+  <td data-label="Can support cargo above"><input data-field="stackable" type="checkbox" aria-label="Can support cargo above" checked></td><td data-label="Orientation"><select data-field="orientation" aria-label="Orientation"><option value="fixed">Fixed</option><option value="yaw">Yaw</option></select></td>
+</tr></template>
 <script>
-  document.getElementById('load-demo').addEventListener('click', () => { document.getElementById('cargo-csv').value = JSON.parse(document.getElementById('demo-csv').textContent); });
-  document.getElementById('csv-file').addEventListener('change', async (event) => {
-    const file = event.target.files[0]; if (!file) return;
-    const feedback = document.getElementById('upload-feedback');
-    if (file.size > 262144) { feedback.textContent = 'CSV files must be under 256 KiB.'; event.target.value = ''; return; }
-    try { document.getElementById('cargo-csv').value = await file.text(); feedback.textContent = `${file.name} loaded into the editor. Review it, then choose Pack cargo.`; }
-    catch (_) { feedback.textContent = 'The selected file could not be read. Try a UTF-8 CSV file.'; }
-  });
+  const rowBody=document.getElementById('cargo-rows'), rowTemplate=document.getElementById('cargo-row-template');
+  const source=document.getElementById('cargo-csv'), csvEditor=document.getElementById('csv-editor'), sourceMode=document.getElementById('source-mode');
+  const manualFeedback=document.getElementById('manual-feedback'), dimensionUnit=document.getElementById('dimension-unit');
+  const columns=['item_id','name','length_mm','width_mm','height_mm','weight_kg','quantity','stackable','orientation'];
+  const lengthFactor={mm:1,cm:10,m:1000};
+  function addRow(values={}) { if(rowBody.children.length>=100)throw new Error('The editor supports at most 100 source rows.');const row=rowTemplate.content.firstElementChild.cloneNode(true);for(const field of columns){const input=row.querySelector(`[data-field="${field}"]`);if(!input)continue;if(field==='stackable'){if(values[field]!==undefined)input.checked=['true','yes','1'].includes(String(values[field]).trim().toLowerCase());}else if(field==='orientation'&&values[field]!==undefined){input.value=String(values[field]).trim().toLowerCase();}else if(values[field]!==undefined)input.value=values[field];}row.querySelector('.remove-row').addEventListener('click',()=>{row.remove();if(!rowBody.children.length)addRow();});rowBody.appendChild(row);return row; }
+  function quoteCsv(value){const text=String(value??'');return /[",\r\n]/.test(text)?`"${text.replaceAll('"','""')}"`:text;}
+  function shiftDecimal(text,places){const value=String(text).trim();if(value.length>40||!/^\d+(?:\.\d*)?$/.test(value))return null;const [whole,fraction='']=value.split('.'),digits=whole+fraction;const point=whole.length+places;let out;if(point<=0)out=`0.${'0'.repeat(-point)}${digits}`;else if(point>=digits.length)out=digits+'0'.repeat(point-digits.length);else out=`${digits.slice(0,point)}.${digits.slice(point)}`;let [a,b='']=out.split('.');a=a.replace(/^0+(?=\d)/,'');b=b.replace(/0+$/,'');return b?`${a}.${b}`:a;}
+  function parseCsv(text){const rows=[];let row=[],cell='',quoted=false;for(let i=0;i<text.length;i++){const ch=text[i];if(quoted){if(ch==='"'&&text[i+1]==='"'){cell+='"';i++;}else if(ch==='"')quoted=false;else cell+=ch;}else if(ch==='"'&&!cell)quoted=true;else if(ch===','){row.push(cell);cell='';}else if(ch==='\n'){row.push(cell.replace(/\r$/,''));rows.push(row);row=[];cell='';}else cell+=ch;}if(quoted)throw new Error('CSV has an unclosed quoted field.');if(cell||row.length){row.push(cell);rows.push(row);}return rows;}
+  function setManualRows(rows){rowBody.replaceChildren();for(const values of rows)addRow(values);if(!rowBody.children.length)addRow();sourceMode.value='manual';manualFeedback.hidden=true;}
+  function csvToRows(text){const parsed=parseCsv(text);if(!parsed.length)throw new Error('CSV is empty.');const headers=parsed.shift().map((h,i)=>i===0?h.replace(/^\uFEFF/,''):h);if(columns.some(c=>!headers.includes(c))||headers.length!==columns.length)throw new Error('CSV columns do not match the template. Keep the CSV for validation or use the template columns.');const values=parsed.filter(r=>r.some(v=>v!==''));if(values.length>100||values.some(r=>r.length!==columns.length))throw new Error('CSV rows must contain exactly nine columns and no more than 100 source rows. Keep this file in CSV mode for validation.');if(values.some(r=>!['true','false','yes','no','1','0'].includes(String(r[headers.indexOf('stackable')]).trim().toLowerCase())||!['fixed','yaw'].includes(String(r[headers.indexOf('orientation')]).trim().toLowerCase())))throw new Error('CSV contains an unsupported stackable or orientation value. Keep this file in CSV mode for validation.');dimensionUnit.value='mm';dimensionUnit.dataset.previous='mm';setManualRows(values.map(row=>Object.fromEntries(columns.map(c=>[c,row[headers.indexOf(c)]??'']))));}
+  function setCsvMode(message){sourceMode.value='csv';document.getElementById('csv-tools').open=true;document.getElementById('csv-mode-feedback').textContent=message||'CSV selected for packing.';}
+  function manualCsv(){const data=[],unitPlace={mm:0,cm:1,m:3};for(const [index,row] of [...rowBody.children].entries()){const v={};for(const field of columns){const el=row.querySelector(`[data-field="${field}"]`);v[field]=field==='stackable'?String(el.checked):el.value.trim();}if(['item_id','name','length_mm','width_mm','height_mm','weight_kg'].every(field=>v[field]===''))continue;for(const field of ['length_mm','width_mm','height_mm']){const shifted=shiftDecimal(v[field],unitPlace[dimensionUnit.value]);if(shifted===null||shifted.includes('.')||BigInt(shifted)<1n)throw new Error(`Row ${index+1}: ${field.replace('_mm','')} must convert exactly to at least one whole millimetre.`);v[field]=shifted;}if(!v.weight_kg)throw new Error(`Row ${index+1}: weight in kilograms is required.`);const grams=shiftDecimal(v.weight_kg,3);if(grams===null||grams.includes('.')||BigInt(grams)<0n)throw new Error(`Row ${index+1}: weight must be in kilograms at 0.001 kg precision.`);const weight=Number(grams)/1000;if(!Number.isFinite(weight))throw new Error(`Row ${index+1}: weight must be finite.`);const gramsValue=BigInt(grams),wholeKg=gramsValue/1000n,milliKg=String(gramsValue%1000n).padStart(3,'0');v.weight_kg=`${wholeKg}.${milliKg}`;data.push(columns.map(c=>quoteCsv(v[c])));}if(!data.length)throw new Error('Add at least one cargo item before packing.');return [columns.join(','),...data.map(r=>r.join(','))].join('\n')+'\n';}
+  document.getElementById('add-row').addEventListener('click',()=>{try{addRow();manualFeedback.hidden=true;}catch(error){manualFeedback.textContent=error.message;manualFeedback.hidden=false;}});
+  document.getElementById('load-demo').addEventListener('click',()=>{dimensionUnit.value='mm';dimensionUnit.dataset.previous='mm';setManualRows([{item_id:'BOX',name:'Sample box',length_mm:'600',width_mm:'400',height_mm:'350',weight_kg:'18',quantity:'4',stackable:'true',orientation:'yaw'},{item_id:'CRATE',name:'Heavy crate',length_mm:'900',width_mm:'700',height_mm:'800',weight_kg:'220',quantity:'1',stackable:'false',orientation:'fixed'}]);document.getElementById('csv-mode-feedback').textContent='Sample loaded into editable cargo rows.';});
+  document.getElementById('load-demo-csv').addEventListener('click',()=>{csvEditor.value=JSON.parse(document.getElementById('demo-csv').textContent);setCsvMode('Sample CSV loaded.');});
+  document.getElementById('load-csv-rows').addEventListener('click',()=>{try{csvToRows(csvEditor.value);document.getElementById('csv-mode-feedback').textContent='CSV rows loaded into the manual editor. Review and pack.';}catch(error){document.getElementById('csv-mode-feedback').textContent=error.message;}});
+  document.getElementById('csv-file').addEventListener('change',async event=>{const file=event.target.files[0];if(!file)return;const feedback=document.getElementById('upload-feedback');if(file.size>262144){feedback.textContent='CSV files must be under 256 KiB.';event.target.value='';return;}try{csvEditor.value=await file.text();setCsvMode(`${file.name} loaded. Review the CSV or load its rows into the editor.`);feedback.textContent=`${file.name} loaded. Choose Pack cargo when ready.`;}catch(_){feedback.textContent='The selected file could not be read. Try a UTF-8 CSV file.';}});
+  document.getElementById('toggle-paste').addEventListener('click',()=>{const panel=document.getElementById('paste-panel');panel.hidden=!panel.hidden;if(!panel.hidden)document.getElementById('excel-paste').focus();});
+  document.getElementById('cancel-paste').addEventListener('click',()=>{document.getElementById('paste-panel').hidden=true;});
+  document.getElementById('apply-paste').addEventListener('click',()=>{const field=document.getElementById('excel-paste'),feedback=document.getElementById('paste-feedback');try{let rows=field.value.trimEnd().split(/\r?\n/).map(line=>line.split('\t'));if(rows.length&&rows[0][0].replace(/^\uFEFF/,'').toLowerCase()==='item_id')rows.shift();if(!rows.length||rows.some(r=>r.length!==columns.length))throw new Error('Paste one or more rows using all nine columns shown above.');if(rowBody.children.length+rows.length>100)throw new Error('The editor supports at most 100 source rows.');if(rows.some(r=>!['true','false','yes','no','1','0'].includes(String(r[7]).trim().toLowerCase())||!['fixed','yaw'].includes(String(r[8]).trim().toLowerCase())))throw new Error('Use true/false for stackable and fixed/yaw for orientation.');for(const values of rows){const normalized=Object.fromEntries(columns.map((c,i)=>[c,values[i]??'']));addRow(normalized);}sourceMode.value='manual';feedback.textContent=`Added ${rows.length} row${rows.length===1?'':'s'}. Review values and pack.`;field.value='';}catch(error){feedback.textContent=error.message;}});
+  dimensionUnit.addEventListener('change',event=>{const oldUnit=dimensionUnit.dataset.previous||'mm',newUnit=event.target.value,place={mm:0,cm:1,m:3};rowBody.querySelectorAll('tr').forEach(row=>['length_mm','width_mm','height_mm'].forEach(field=>{const input=row.querySelector(`[data-field="${field}"]`);if(input.value!==''){const converted=shiftDecimal(input.value,place[oldUnit]-place[newUnit]);if(converted!==null)input.value=converted;}}));dimensionUnit.dataset.previous=newUnit;});
+  dimensionUnit.dataset.previous='mm';
+  document.getElementById('cargo-form').addEventListener('submit',event=>{manualFeedback.hidden=true;try{source.value=sourceMode.value==='csv'?csvEditor.value:manualCsv();if(!source.value.trim())throw new Error('Add cargo or load a CSV before packing.');}catch(error){event.preventDefault();manualFeedback.textContent=error.message;manualFeedback.hidden=false;manualFeedback.focus();}});
+  rowBody.addEventListener('input',()=>{sourceMode.value='manual';}); rowBody.addEventListener('change',()=>{sourceMode.value='manual';}); csvEditor.addEventListener('input',()=>setCsvMode('CSV selected for packing.'));
+  const weatherForm=document.getElementById('weather-form');
+  if(weatherForm)weatherForm.addEventListener('submit',async event=>{event.preventDefault();const feedback=document.getElementById('weather-feedback'),button=document.getElementById('weather-submit'),result=document.getElementById('weather-result');button.disabled=true;feedback.textContent='Requesting forecast…';result.hidden=true;try{const response=await fetch(weatherForm.action,{method:'POST',body:new FormData(weatherForm),credentials:'same-origin'});let payload;try{payload=await response.json();}catch(_){throw new Error(response.status===403?'Request rejected by security checks. Refresh the page and try again.':'Forecast response could not be read.');}if(!response.ok)throw new Error(payload.error?.message||`Forecast unavailable (HTTP ${response.status}).`);const show=(id,value,suffix='')=>{document.getElementById(id).textContent=value===null||value===undefined?'Unknown':`${value}${suffix}`;};show('weather-requested',`${payload.requested_coordinates.latitude}, ${payload.requested_coordinates.longitude}`);show('weather-grid',`${payload.forecast_grid_coordinates.latitude}, ${payload.forecast_grid_coordinates.longitude}`);show('weather-valid',payload.valid_at);show('weather-retrieved',payload.retrieved_at);show('weather-height',payload.wave_height_m,' m');show('weather-period',payload.wave_period_s,' s');show('weather-direction',payload.wave_direction_deg,'°');const sourceLink=document.getElementById('weather-source');sourceLink.href=payload.source.url;sourceLink.textContent=payload.source.name;document.getElementById('weather-model').textContent=payload.source.model;const attribution=document.getElementById('weather-attribution');attribution.href=payload.source.model_attribution_url;attribution.textContent=payload.source.model_attribution;feedback.textContent=payload.notice;result.hidden=false;}catch(error){feedback.textContent=error.message||'Forecast request failed. Try again later.';}finally{button.disabled=false;}});
+  const existingSource=source.value;if(existingSource.trim()){try{csvToRows(existingSource);}catch(_){setCsvMode('This CSV is preserved for correction and validation.');}}
+  if(!rowBody.children.length)addRow();
   const buttons = [...document.querySelectorAll('.item-link')];
   buttons.forEach(button => {
     const id = button.dataset.itemId;

@@ -19,3 +19,5 @@ services:
         value: dcd_project.settings_render
       - key: SECRET_KEY
         sync: false
+      - key: CARGO_WEATHER_FREE_API_ENABLED
+        value: 'true'

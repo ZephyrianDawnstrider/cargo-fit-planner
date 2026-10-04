@@ -21,6 +21,7 @@ if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.onrender\.com", REND
     raise RuntimeError("RENDER_EXTERNAL_HOSTNAME must be the canonical *.onrender.com hostname")
 
 DEBUG = False
+WEATHER_FREE_API_ENABLED = os.environ.get("CARGO_WEATHER_FREE_API_ENABLED", "").strip().lower() == "true"
 ALLOWED_HOSTS = [RENDER_HOST]
 CSRF_TRUSTED_ORIGINS = [f"https://{RENDER_HOST}"]
 ROOT_URLCONF = "dcd_project.urls_render"

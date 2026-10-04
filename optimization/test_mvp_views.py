@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from . import mvp_views
 from .packing import DEMO_CSV
+from .tracking import TrackingError
 
 
 class CargoMvpViewTests(SimpleTestCase):
@@ -14,9 +15,67 @@ class CargoMvpViewTests(SimpleTestCase):
         response = self.client.get(reverse("upload"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Cargo Fit Planner")
-        self.assertContains(response, "Download CSV template")
-        self.assertContains(response, "Load synthetic example")
+        self.assertContains(response, "CSV template")
+        self.assertContains(response, "Load sample cargo")
+        self.assertContains(response, "Paste Excel rows")
+        self.assertContains(response, "Dimension entry unit")
+        self.assertContains(response, 'id="cargo-editor"')
+        self.assertContains(response, 'id="csv-editor"')
         self.assertContains(response, 'id="demo-csv"')
+        self.assertContains(response, "Optional vessel and marine conditions")
+        self.assertContains(response, "AIS status: unconfigured")
+        self.assertContains(response, "AISStream developer docs")
+        self.assertContains(response, "Preview appears after packing")
+
+    @patch.object(mvp_views, "get_marine_forecast")
+    def test_weather_endpoint_returns_manual_coordinate_forecast_without_store(self, provider):
+        from django.test import override_settings
+
+        provider.return_value = {
+            "status": "forecast",
+            "requested_coordinates": {"latitude": 12.5, "longitude": 72.5},
+            "forecast_grid_coordinates": {"latitude": 12.25, "longitude": 72.75},
+            "valid_at": "2026-10-04T12:00:00Z", "retrieved_at": "2026-10-04T11:00:00Z",
+            "wave_height_m": None, "wave_period_s": 4.2, "wave_direction_deg": 180,
+            "source": {"name": "Open-Meteo", "url": "https://open-meteo.com/", "model": "Best Match", "model_attribution": "Provider data", "model_attribution_url": "https://open-meteo.com/"},
+            "cached": False, "notice": "Forecast only.",
+        }
+        with override_settings(WEATHER_FREE_API_ENABLED=True):
+            response = self.client.post(reverse("marine-forecast"), {"latitude": "12.5", "longitude": "72.5"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("no-store", response["Cache-Control"])
+        self.assertIsNone(response.json()["wave_height_m"])
+        self.assertEqual(response.json()["forecast_grid_coordinates"]["latitude"], 12.25)
+        provider.assert_called_once_with("12.5", "72.5")
+
+    @patch.object(mvp_views, "get_marine_forecast")
+    def test_weather_disabled_and_provider_errors_are_safe_json(self, provider):
+        from django.test import override_settings
+
+        with override_settings(WEATHER_FREE_API_ENABLED=False):
+            disabled = self.client.post(reverse("marine-forecast"), {"latitude": "0", "longitude": "0"})
+        self.assertEqual(disabled.status_code, 503)
+        self.assertIn("no-store", disabled["Cache-Control"])
+        provider.assert_not_called()
+        provider.side_effect = TrackingError("invalid_coordinates", "Enter finite WGS84 coordinates.", 400)
+        with override_settings(WEATHER_FREE_API_ENABLED=True):
+            invalid = self.client.post(reverse("marine-forecast"), {"latitude": "999", "longitude": "0"})
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(invalid.json(), {"error": {"code": "invalid_coordinates", "message": "Enter finite WGS84 coordinates."}})
+        self.assertIn("no-store", invalid["Cache-Control"])
+
+    def test_manual_entry_submits_canonical_csv_and_retains_snapshot_export(self):
+        source = (
+            "item_id,name,length_mm,width_mm,height_mm,weight_kg,quantity,stackable,orientation\n"
+            "PASTE,Excel pallet,800,600,500,25.125,1,false,fixed\n"
+        )
+        response = self.client.post(reverse("upload"), {"cargo_csv": source})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["cargo_csv"], source)
+        self.assertEqual(response.context["result"]["totals"]["input_count"], 1)
+        export = self.client.post(reverse("export-csv"), {"cargo_csv": response.context["cargo_csv"]})
+        self.assertEqual(export.status_code, 200)
+        self.assertContains(response, "Excel pallet")
 
     def test_post_shows_conserved_quantity_and_placed_geometry(self):
         response = self.client.post(reverse("upload"), {"cargo_csv": DEMO_CSV})
@@ -28,11 +87,11 @@ class CargoMvpViewTests(SimpleTestCase):
             5,
         )
         self.assertContains(response, "BOX-001")
-        self.assertContains(response, "Isometric loading view")
+        self.assertContains(response, "3D placement preview")
         self.assertContains(response, "Change view angle")
         self.assertContains(response, "source rows")
-        self.assertContains(response, "expanded input units")
-        self.assertContains(response, "placed weight ÷ payload limit")
+        self.assertContains(response, "expanded input")
+        self.assertContains(response, "Capacity, weight and container details")
         self.assertContains(response, 'aria-labelledby="scene-title scene-description"')
         html = response.content.decode("utf-8")
         self.assertEqual(html.count('name="cargo_csv" value='), 2)
@@ -84,7 +143,7 @@ class CargoMvpViewTests(SimpleTestCase):
         self.assertContains(response, "100.0, 100.0, 100.0")
         self.assertContains(response, "30000.000 kg")
         self.assertContains(response, "÷ payload limit")
-        self.assertContains(response, "neither ratio predicts whether additional cargo will fit")
+        self.assertContains(response, "Ratios describe capacity only and do not predict fit")
 
         export = self.client.post(reverse("export-csv"), {"cargo_csv": source})
         rows = list(csv.DictReader(io.StringIO(export.content.decode("utf-8"))))
