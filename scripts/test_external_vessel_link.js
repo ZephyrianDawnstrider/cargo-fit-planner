@@ -1,4 +1,4 @@
-const assert=require('node:assert/strict'); const nodes={};const document={getElementById:id=>nodes[id]??=( {hidden:true,value:'',textContent:'',addEventListener(type,fn){this[type]=fn;},removeAttribute(key){delete this[key];}})};
+const assert=require('node:assert/strict'); const nodes={};const document={getElementById:id=>nodes[id]??=( {hidden:true,value:'',textContent:'',addEventListener(type,fn){const previous=this[type];this[type]=(...args)=>{if(previous)previous(...args);return fn(...args);};},removeAttribute(key){delete this[key];}})};
 const template=require('node:fs').readFileSync('optimization/templates/optimization/mvp.html','utf8');
 eval(template.slice(template.indexOf('  const externalVesselForm='),template.indexOf('  const vfForm=')));
 const form=nodes['external-vessel-form'], input=nodes['external-vessel-imo'],link=nodes['external-vessel-link'];

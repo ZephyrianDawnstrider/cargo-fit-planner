@@ -98,3 +98,16 @@ Vessel boundary safeguards: one in-flight request, two-second minimum between un
 Optional VesselFinder widget: the reviewed branch includes a **disabled-by-default**, user-click-only official map for a known IMO/MMSI. `VESSELFINDER_EMBED_ENABLED=True` may be set in application settings only after confirming the intended use is permitted. No shipped settings enable it. See the [usage and verification limits](docs/evidence/consolidation-2026-11-17.md). It is isolated third-party content, not our global search/detail API; no positions are scraped, and its actual browser behavior remains unverified.
 
 Local personal-use evaluation only: `CARGO_OPEN_WATERS_PERSONAL_DEMO=true` with `dcd_project.settings_demo` opts into the no-key Open Waters name-prefix/MMSI adapter. It is OFF by default and is not activated by Render settings. The API's free tier is personal-use, not authorization for company operations. Coverage can be stale or absent; anonymous IMO and port search are unsupported. Returned source attribution and timestamps remain visible; registry enrichment is deliberately excluded. Read the [evaluation evidence and limitations](docs/evidence/consolidation-2026-11-17.md) before enabling any public deployment.
+
+### Ship-name identity directory
+
+The optional user-triggered name lookup reads Wikidata structured data (CC0), not AIS.
+It returns a bounded set of records with checksum-valid IMO identifiers and requires
+explicit identity selection. Names can be aliases, obsolete or ambiguous; verify the
+IMO with the logistics provider. No match is not evidence that a vessel does not exist.
+The next action is a separate, explicit external VesselFinder link. No positions,
+photos or tracks are imported from that site. No container-to-ship assignment is inferred.
+Only the submitted ship name is sent to Wikidata, not the cargo form. Transport bounds,
+process-local cache and budgets protect the demo; they reset on process restart and
+are not global quotas. Public operational use still needs an appropriate position provider.
+Source and license: https://www.wikidata.org/wiki/Wikidata:Data_access
