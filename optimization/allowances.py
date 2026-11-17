@@ -5,7 +5,7 @@ Coordinates identify the measured cargo minimum corner, also the envelope origin
 """
 from copy import deepcopy
 
-from .allocation import pack_allocated, validate_allocation
+from .allocation import pack_allocated, validate_allocation, _config as _allocation_config, _select_quota
 from .manual_layout import validate_manual_layout, ManualLayoutError
 from .packing import _validate_items, _resolve_container, _custom_container, _mass_distribution, pack_items
 
@@ -105,14 +105,105 @@ def _restore(engine, source, container, config):
     return result
 
 
+COMBINED_NOTICE = ('Customer quotas use original measured gross cargo volume and mass against whole original equipment, '
+                   'not enlarged envelope volume or reduced usable space. Original partition boundaries stay fixed. '
+                   'Each internal horizontal partition high edge reserves one additional horizontal gap; this conservative '
+                   'buffer also applies when the adjacent partition is empty. Physical outer boundaries do not add this '
+                   'buffer. Wall and roof clearances apply only at physical equipment boundaries. All placements are '
+                   'floor-only; elevated partitions remain held. Door checks use the real globally reduced opening, '
+                   'with local region width/height additionally limiting fit, not a claim about a loading path.')
+
+
+def _combined_region_bounds(customer, container, config):
+    """Envelope bounds, original region intersected with physical clearances."""
+    inner = container['inside_mm']
+    wall, gap = config['wall_clearance_mm'], config['horizontal_gap_mm']
+    bounds = deepcopy(customer['bounds_mm'])
+    for axis, dim in (('x', 'length'), ('y', 'width')):
+        low, high = bounds[axis]
+        buffer = gap if high < inner[dim] else 0
+        bounds[axis] = [max(low, wall), min(high-buffer, inner[dim]-wall)]
+    bounds['z'][1] = min(bounds['z'][1], inner['height']-config['roof_clearance_mm'])
+    return bounds
+
+
+def _validate_combined(result, allocation, config):
+    result = validate_allocation(result, allocation)
+    for customer in result['allocation']['customers']:
+        bounds = _combined_region_bounds(customer, result['container'], config)
+        customer['planning_envelope_bounds_mm'] = bounds
+        customer['quota_volume_basis'] = 'original_measured_gross_cargo'
+        customer['placed_envelope_volume_m3'] = 0
+        for cargo in result['placed']:
+            if cargo['customer_id'] != customer['id']:
+                continue
+            envelope = cargo['planning_envelope_mm']
+            for axis, extent in zip('xyz', ('dx', 'dy', 'dz')):
+                if cargo[axis] < bounds[axis][0] or cargo[axis]+envelope[extent] > bounds[axis][1]:
+                    raise ManualLayoutError('allocation_envelope_bounds',
+                                            'Tolerance envelope enters a reserved boundary buffer or leaves its customer region.',
+                                            [cargo['item_id']])
+            customer['placed_envelope_volume_m3'] += envelope['dx']*envelope['dy']*envelope['dz']/1e9
+    result['allocation']['notice'] += ' ' + COMBINED_NOTICE
+    result['allowances']['allocation_boundary_policy'] = 'one_horizontal_gap_at_internal_high_edges'
+    result['allowances']['allocation_notice'] = COMBINED_NOTICE
+    return result
+
+
+def _pack_combined(source, container, allocation, config):
+    customers = _allocation_config(allocation, source, container)
+    transformed, global_profile = _transform(source, container, config)
+    transformed_by_id = {p['item_id']: p for p in transformed}
+    placed, unplaced, shared = [], [], []
+    wall, gap = config['wall_clearance_mm'], config['horizontal_gap_mm']
+    for customer in customers:
+        eligible, held = _select_quota(source, customer, container)
+        unplaced.extend(held)
+        if not eligible:
+            continue
+        if customer['region'] is None:
+            shared.extend(transformed_by_id[p['item_id']] for p in eligible)
+            continue
+        bounds = _combined_region_bounds(customer, container, config)
+        # Engine boxes include trailing horizontal gap. Add it back to the
+        # envelope bounds here; internal boundary buffer has already removed it.
+        inside = {'length': bounds['x'][1]-bounds['x'][0]+gap,
+                  'width': bounds['y'][1]-bounds['y'][0]+gap,
+                  'height': bounds['z'][1]-bounds['z'][0]}
+        if any(bounds[a][1] <= bounds[a][0] for a in 'xyz'):
+            unplaced.extend({**p, 'reason': 'allocation_clearances_no_usable_region'} for p in eligible)
+            continue
+        profile = deepcopy(global_profile)
+        profile['inside_mm'] = inside
+        profile['door_mm'] = {k: min(global_profile['door_mm'][k], inside[k]) for k in ('width', 'height')}
+        result = pack_items([transformed_by_id[p['item_id']] for p in eligible], 'custom_dry', custom_profile=profile)
+        for p in result['placed']:
+            # _restore applies the global wall inset. These offsets cancel it
+            # so the output remains in the original physical equipment frame.
+            placed.append({**p, 'x': p['x']+bounds['x'][0]-wall,
+                           'y': p['y']+bounds['y'][0]-wall, 'z': p['z']})
+        unplaced.extend(result['unplaced'])
+    if shared:
+        result = pack_items(shared, 'custom_dry', custom_profile=global_profile)
+        placed.extend(result['placed'])
+        unplaced.extend(result['unplaced'])
+    holds = sum(p['reason']=='manual_compliance_hold' for p in unplaced)
+    engine = {'container': container, 'placed': placed, 'unplaced': unplaced,
+              'readiness': 'manual_compliance_hold' if holds else 'packing_preview_only',
+              'totals': {'input_count': len(source), 'placed_count': len(placed), 'unplaced_count': len(unplaced),
+                         'manual_compliance_hold_count': holds,
+                         'placed_weight_kg': sum(int(round(p['weight_kg']*1000)) for p in placed)/1000}}
+    return _validate_combined(_restore(engine, source, container, config), allocation, config)
+
+
 def pack_with_allowances(items, container_id='20std', custom_profile=None, allocation=None, allowances=None):
     config = _settings(allowances)
     if not _active(config):
         return pack_allocated(items, container_id, custom_profile, allocation)
-    if allocation is not None:
-        raise ValueError('Customer allocations cannot yet be combined with nonzero allowances')
     source = _validate_items(items)
     container = _equipment(container_id, custom_profile)
+    if allocation is not None:
+        return _pack_combined(source, container, allocation, config)
     transformed, profile = _transform(source, container, config)
     engine = pack_items(transformed, 'custom_dry', custom_profile=profile)
     return _restore(engine, source, container, config)
@@ -126,8 +217,6 @@ def validate_with_allowances(result, placements, source_items, allowances=None, 
             raise ValueError('Allowance settings changed; repack before editing')
         updated = validate_manual_layout(result, placements, source_items=source_items)
         return validate_allocation(updated, allocation) if allocation is not None else updated
-    if allocation is not None:
-        raise ValueError('Customer allocations cannot yet be combined with nonzero allowances')
     if result.get('allowances', {}).get('config') != config:
         raise ValueError('Allowance settings changed; repack before editing')
     source = _validate_items(source_items)
@@ -154,5 +243,17 @@ def validate_with_allowances(result, placements, source_items, allowances=None, 
             raise ManualLayoutError('wall_clearance', f"Keep cargo at least {config['wall_clearance_mm']} mm from the side/end walls.", [edit['item_id']])
         edit['x'] -= config['wall_clearance_mm']
         edit['y'] -= config['wall_clearance_mm']
-    checked = validate_manual_layout(engine, edits, source_items=transformed)
-    return _restore(checked, source, result['container'], config)
+    try:
+        checked = validate_manual_layout(engine, edits, source_items=transformed)
+    except ManualLayoutError as exc:
+        # Measured cargo geometry already passed above. This second pass checks
+        # enlarged planning envelopes plus the requested horizontal gap.
+        if exc.code == 'overlap':
+            raise ManualLayoutError(
+                'planning_clearance_overlap',
+                'Tolerance envelopes overlap or the required horizontal inter-cargo gap is not maintained. '
+                'Measured cargo boxes may still be separate.',
+                exc.item_ids) from None
+        raise
+    restored = _restore(checked, source, result['container'], config)
+    return _validate_combined(restored, allocation, config) if allocation is not None else restored

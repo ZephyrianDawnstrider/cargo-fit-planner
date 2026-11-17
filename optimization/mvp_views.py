@@ -261,7 +261,7 @@ def export_csv(request):
         fields = [
             "item_id", "source_item_id", "customer_id", "name", "status", "reason",
             "x", "y", "z", "dx", "dy", "dz",
-            "planning_envelope_dx_mm", "planning_envelope_dy_mm", "planning_envelope_dz_mm", "planning_allowances_json",
+            "planning_envelope_dx_mm", "planning_envelope_dy_mm", "planning_envelope_dz_mm", "planning_allowances_json", "customer_allocation_json",
             "length_mm", "width_mm", "height_mm", "weight_kg", "stackable",
             "orientation", "rotation_deg", "load_unit_type", "floor_only", "is_dg",
             "max_supported_load_kg", "stacking_rating_source", "supported_cargo_kg",
@@ -277,6 +277,7 @@ def export_csv(request):
         export_profile = {
             "container_id": profile["id"], "container_name": profile["name"],
             "planning_allowances_json": json.dumps(result.get("allowances", {}), ensure_ascii=False),
+            "customer_allocation_json": json.dumps(result.get("allocation", {}), ensure_ascii=False),
             "whole_load_cost_estimate": result["pricing"]["amount"],
             "cost_currency": result["pricing"]["currency"], "cost_status": result["pricing"]["status"],
             "profile_length_mm": profile["inside_mm"]["length"],

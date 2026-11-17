@@ -88,7 +88,7 @@ class AllowanceTests(unittest.TestCase):
     def test_bad_config_and_combination(self):
         for cfg in ({'horizontal_gap_mm':1},{'wall_clearance_mm':True},{'roof_clearance_mm':101},{'unknown':0}):
             with self.subTest(cfg=cfg),self.assertRaises(ValueError):pack_with_allowances([item('a')],allowances=cfg)
-        with self.assertRaisesRegex(ValueError,'allocations'):
+        with self.assertRaisesRegex(ValueError,'customers'):
             pack_with_allowances([item('a')],allocation={},allowances=settings())
 
     def test_source_or_settings_change_rejected(self):
