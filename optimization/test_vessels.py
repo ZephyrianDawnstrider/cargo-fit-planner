@@ -72,3 +72,28 @@ class VesselBoundaryTests(SimpleTestCase):
             self.assertEqual(vessels.detail('ship:demo')['source_url'],'https://example.com/')
             self.adapter.search.return_value['results'][0]['imo']='12345678'
             with self.assertRaises(TrackingError):vessels.search('Invalid eight-digit fixture')
+
+class VesselFinderEmbedTests(SimpleTestCase):
+    def test_disabled_by_default_no_external_script(self):
+        with override_settings(VESSELFINDER_EMBED_ENABLED=False):
+            self.assertEqual(self.client.get(reverse('vesselfinder-embed'),{'kind':'imo','identifier':'9506291'}).status_code,503)
+            page=self.client.get(reverse('upload')).content.decode()
+            self.assertNotIn('id="vf-form"',page)
+            self.assertNotIn('src="https://www.vesselfinder.com/aismap.js"',page)
+    @override_settings(VESSELFINDER_EMBED_ENABLED=True)
+    def test_official_script_is_isolated_and_only_numeric_identifier(self):
+        r=self.client.get(reverse('vesselfinder-embed'),{'kind':'imo','identifier':'9506291','track':'1','cargo_csv':'PRIVATE_CARGO'})
+        self.assertEqual(r.status_code,200)
+        self.assertIn('sandbox allow-scripts',r['Content-Security-Policy'])
+        self.assertNotIn('allow-same-origin',r['Content-Security-Policy'])
+        self.assertEqual(r['Referrer-Policy'],'no-referrer')
+        self.assertContains(r,'src="https://www.vesselfinder.com/aismap.js"')
+        self.assertContains(r,'var imo="9506291";var show_track=true;')
+        self.assertNotContains(r,'PRIVATE_CARGO')
+        self.assertContains(self.client.get(reverse('upload')),'id="vf-form"')
+        self.assertEqual(self.client.get(reverse('vesselfinder-embed'),{'kind':'mmsi','identifier':'123456789'}).status_code,200)
+    @override_settings(VESSELFINDER_EMBED_ENABLED=True)
+    def test_reject_injection_invalid_kind_and_bad_identifier(self):
+        for kind,identifier in [('imo','12345678'),('mmsi','1234567'),('name','Synthetic'),('imo','</script>'),('imo','１２３４５６７')]:
+            self.assertEqual(self.client.get(reverse('vesselfinder-embed'),{'kind':kind,'identifier':identifier}).status_code,400)
+        self.assertEqual(self.client.post(reverse('vesselfinder-embed')).status_code,405)

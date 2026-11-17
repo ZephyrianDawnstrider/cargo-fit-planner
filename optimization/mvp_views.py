@@ -3,6 +3,7 @@
 import csv
 import io
 import json
+import re
 import threading
 from decimal import Decimal
 
@@ -126,6 +127,7 @@ def index(request):
     context = {
         "csv_template": CSV_TEMPLATE,
         "demo_csv": DEMO_CSV,
+        "vesselfinder_embed_enabled": getattr(settings, "VESSELFINDER_EMBED_ENABLED", False),
         "weather_enabled": getattr(settings, "WEATHER_FREE_API_ENABLED", False),
         "ais_status": ({"status": "provider_adapter_configured"} if getattr(settings, "VESSEL_DATA_PROVIDER", None) is not None else get_ais_status()),
         "container_choices": _container_choices(),
@@ -354,3 +356,29 @@ def vessel_detail(request):
     except TrackingError as exc:
         return JsonResponse({'error': {'code': exc.code, 'message': exc.message}}, status=exc.status)
     return JsonResponse(payload)
+
+
+@require_GET
+@never_cache
+def vesselfinder_embed(request):
+    """Opt-in, isolated official widget; never an AIS data extraction endpoint."""
+    if not getattr(settings, "VESSELFINDER_EMBED_ENABLED", False):
+        return HttpResponse("VesselFinder embed is disabled pending usage-scope review.", status=503)
+    kind = request.GET.get("kind", "")
+    identifier = request.GET.get("identifier", "")
+    if kind not in ("imo", "mmsi") or not re.fullmatch(r"[0-9]{7}" if kind == "imo" else r"[0-9]{9}", identifier):
+        return HttpResponse("Enter a seven-digit IMO or nine-digit MMSI.", status=400)
+    track = "true" if request.GET.get("track") == "1" else "false"
+    # Only the fixed enum and digits enter executable markup. Use documented widget,
+    # not undocumented iframe endpoints, scraping or a server-side provider call.
+    html = ('<!doctype html><html><head><meta charset="utf-8"><meta name="referrer" content="no-referrer">'
+            '<title>VesselFinder third-party map</title></head><body>'
+            '<p>Map by <a href="https://www.vesselfinder.com/" target="_blank" rel="noopener noreferrer">VesselFinder</a>. '
+            'Coverage and position freshness are controlled by VesselFinder. Not for navigation.</p>'
+            '<script>var width="100%",height="400",names=true;var ' + kind + '="' + identifier + '";var show_track=' + track + ';</script>'
+            '<script src="https://www.vesselfinder.com/aismap.js"></script></body></html>')
+    response = HttpResponse(html)
+    response["X-Frame-Options"] = "SAMEORIGIN"
+    response["Content-Security-Policy"] = "sandbox allow-scripts allow-popups"
+    response["Referrer-Policy"] = "no-referrer"
+    return response
