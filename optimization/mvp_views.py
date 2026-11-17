@@ -127,7 +127,7 @@ def index(request):
         "csv_template": CSV_TEMPLATE,
         "demo_csv": DEMO_CSV,
         "weather_enabled": getattr(settings, "WEATHER_FREE_API_ENABLED", False),
-        "ais_status": get_ais_status(),
+        "ais_status": ({"status": "provider_adapter_configured"} if getattr(settings, "VESSEL_DATA_PROVIDER", None) is not None else get_ais_status()),
         "container_choices": _container_choices(),
         "selected_container_id": "20std",
         "selected_profile": _selected_profile("20std"),

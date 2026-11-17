@@ -7,9 +7,58 @@ inputs never choose an upstream URL. No scraping or invented positions fallback.
 from datetime import datetime, timezone, timedelta
 import math
 import re
+import threading
+import time
+from collections import OrderedDict
+from copy import deepcopy
 from urllib.parse import urlsplit
 from django.conf import settings
 from .tracking import TrackingError
+
+
+
+MIN_INTERVAL = 2.0
+CACHE_TTL = 60.0
+CACHE_MAX_KEYS = 32
+MAX_DAILY_ATTEMPTS = 200
+_lock = threading.Lock()
+_cache = OrderedDict()
+_last_attempt = None
+_daily_date = None
+_daily_attempts = 0
+
+
+def _bounded(key, operation):
+    """Per-process safeguards, not a durable account-wide billing cap."""
+    global _last_attempt, _daily_date, _daily_attempts
+    if not _lock.acquire(blocking=False):
+        raise TrackingError('vessel_busy','Another vessel request is running. Retry shortly.',429)
+    try:
+        now = time.monotonic()
+        for old in list(_cache):
+            if now - _cache[old][0] >= CACHE_TTL: del _cache[old]
+        if key in _cache:
+            _cache.move_to_end(key)
+            result = deepcopy(_cache[key][1])
+            if result.get('position'):
+                stamp = datetime.fromisoformat(result['position']['observed_at'])
+                age = max(0,int((datetime.now(timezone.utc)-stamp).total_seconds()))
+                result['position'].update(age_seconds=age, stale=age>3600)
+            return result
+        if _last_attempt is not None and now - _last_attempt < MIN_INTERVAL:
+            raise TrackingError('vessel_rate_limit','Wait two seconds between new vessel requests.',429)
+        today = datetime.now(timezone.utc).date()
+        if today != _daily_date: _daily_date, _daily_attempts = today, 0
+        if _daily_attempts >= MAX_DAILY_ATTEMPTS:
+            raise TrackingError('vessel_daily_budget','The vessel provider request budget is exhausted for today (UTC).',429)
+        _last_attempt = now
+        _daily_attempts += 1
+        result = operation()
+        _cache[key] = (now,deepcopy(result))
+        while len(_cache)>CACHE_MAX_KEYS: _cache.popitem(last=False)
+        return result
+    finally:
+        _lock.release()
 
 
 def _text(value, limit, label, empty=False):
@@ -35,9 +84,9 @@ def _identity(raw):
     kind=raw.get('kind','vessel')
     if kind not in ('vessel','port'):raise ValueError('Invalid result type')
     item={'id':ident,'kind':kind,'name':_text(raw.get('name'),120,'name')}
-    for key,size in [('imo',8),('mmsi',9)]:
+    for key,size in [('imo',7),('mmsi',9)]:
         value=_text(raw.get(key,''),size,key,True)
-        if value and (not value.isascii() or not value.isdigit() or (key=='imo' and len(value) not in (7,8)) or (key=='mmsi' and len(value)!=9)):
+        if value and (not value.isascii() or not value.isdigit() or (key=='imo' and len(value)!=7) or (key=='mmsi' and len(value)!=9)):
             raise ValueError('Invalid identity')
         item[key]=value
     item['unlocode']=_text(raw.get('unlocode',''),5,'port code',True)
@@ -47,6 +96,10 @@ def _identity(raw):
 def search(query):
     query=_text(query,120,'ship name, IMO, MMSI or port code')
     adapter=_adapter()
+    return _bounded(('search',query.casefold()),lambda:_search_from(adapter,query))
+
+
+def _search_from(adapter, query):
     try:
         result=adapter.search(query,limit=20)
         if not isinstance(result,dict) or not isinstance(result.get('results'),list) or len(result['results'])>20:
@@ -64,6 +117,10 @@ def detail(identifier):
     if not re.fullmatch(r'[A-Za-z0-9:_-]+',identifier):
         raise TrackingError('invalid_vessel_data','Invalid provider identifier.',400)
     adapter=_adapter()
+    return _bounded(('detail',identifier),lambda:_detail_from(adapter,identifier))
+
+
+def _detail_from(adapter, identifier):
     try:
         raw=adapter.detail(identifier)
         item=_identity(raw)
@@ -71,7 +128,9 @@ def detail(identifier):
         item['source_name']=_text(raw.get('source_name'),120,'source')
         source_url=_text(raw.get('source_url',''),500,'source URL',True)
         if source_url and (urlsplit(source_url).scheme!='https' or not urlsplit(source_url).netloc or urlsplit(source_url).username):raise ValueError('Invalid source URL')
-        item['source_url']=source_url
+        # Attribution uses only the public origin, never a provider request path/query
+        # that could accidentally contain an API credential.
+        item['source_url']=('https://'+urlsplit(source_url).hostname+'/') if source_url else ''
         item['position']=None
         if raw.get('position') is not None:
             pos=raw['position']
@@ -89,7 +148,7 @@ def detail(identifier):
             v=raw.get(key)
             if v is not None and (isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or not 0<=v<=limit):raise ValueError('Invalid measurement')
             item[key]=v
-        for key in ('origin','destination','reported_eta'):
+        for key in ('origin','destination','reported_eta','reported_atd','flag','navigation_status'):
             item[key]=_text(raw.get(key,''),120,key,True) or None
         item['notice']='Last reported vessel/port information, not container GPS or guaranteed real-time coverage. ETA is provider-reported, not a prediction. Positions older than one hour are labeled stale.'
         return item

@@ -1,6 +1,6 @@
 from copy import deepcopy
 from datetime import datetime,timezone,timedelta
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from django.test import SimpleTestCase,override_settings
 from django.urls import reverse
 from . import vessels
@@ -8,6 +8,9 @@ from .tracking import TrackingError
 
 class VesselBoundaryTests(SimpleTestCase):
     def setUp(self):
+        vessels._cache.clear();vessels._last_attempt=None;vessels._daily_date=None;vessels._daily_attempts=0
+        patch.object(vessels,'MIN_INTERVAL',0).start();patch.object(vessels,'CACHE_TTL',0).start()
+        self.addCleanup(patch.stopall)
         self.adapter=Mock()
         self.identity={'id':'ship:demo','kind':'vessel','name':'Synthetic Vessel','imo':'9074729','mmsi':'123456789'}
         self.details={**self.identity,'source_name':'Synthetic fixture only','source_url':'https://example.com','position':{'latitude':0,'longitude':0,'observed_at':(datetime.now(timezone.utc)-timedelta(minutes=34)).isoformat()},'speed_knots':0,'course_degrees':None,'draught_m':None}
@@ -51,3 +54,21 @@ class VesselBoundaryTests(SimpleTestCase):
     def test_name_not_html_interpolated_in_ui(self):
         r=self.client.get(reverse('upload'));self.assertContains(r,"document.createElement('button')")
         self.assertContains(r,'No automatic container-to-vessel association')
+
+    def test_provider_budget_cache_and_failure_count(self):
+        with override_settings(VESSEL_DATA_PROVIDER=self.adapter),patch.object(vessels,'CACHE_TTL',60),patch.object(vessels,'MIN_INTERVAL',2):
+            first=vessels.search('Synthetic Vessel');first['results'][0]['name']='Changed'
+            cached=vessels.search('Synthetic Vessel');self.assertNotEqual(cached['results'][0]['name'],'Changed')
+            self.adapter.search.assert_called_once()
+            with self.assertRaises(TrackingError) as raised:vessels.search('Different')
+            self.assertEqual(raised.exception.code,'vessel_rate_limit')
+            vessels._last_attempt=None;vessels._daily_attempts=200
+            with self.assertRaises(TrackingError) as raised:vessels.search('Different')
+            self.assertEqual(raised.exception.code,'vessel_daily_budget')
+    def test_imo_format_and_optional_fields(self):
+        self.details.update(flag='Synthetic',navigation_status='Under way',reported_atd='Provider-reported test value',source_url='https://example.com/private-request-path?key=synthetic-secret')
+        with override_settings(VESSEL_DATA_PROVIDER=self.adapter):
+            self.assertEqual(vessels.detail('ship:demo')['navigation_status'],'Under way')
+            self.assertEqual(vessels.detail('ship:demo')['source_url'],'https://example.com/')
+            self.adapter.search.return_value['results'][0]['imo']='12345678'
+            with self.assertRaises(TrackingError):vessels.search('Invalid eight-digit fixture')
