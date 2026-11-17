@@ -82,3 +82,23 @@ class CombinedAllowanceViewsTests(SimpleTestCase):
         self.assertEqual(result['totals']['placed_count'], 1)
         self.assertEqual(result['unplaced'][0]['reason'], 'customer_volume_quota')
         self.assertContains(self.client.get('/'), 'Customer quotas count measured gross cargo')
+
+    def test_gap_message_does_not_claim_measured_collision(self):
+        data = self.data()
+        result = self.client.post('/export/json/', data).json()
+        edits = [{k: int(p[k]) if k != 'item_id' else p[k]
+                  for k in ('item_id', 'x', 'y', 'z', 'rotation_deg')}
+                 for p in result['placed']]
+        for edit in edits:
+            if edit['item_id'].startswith('A-'):
+                edit['x'] = 71
+        data['manual_layout_json'] = json.dumps(edits)
+        response = self.client.post('/layout/validate/', data)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn(b'Tolerance envelopes overlap or the required horizontal inter-cargo gap', response.content)
+        # An actual measured-box intersection retains the original explanation.
+        edits[0]['x'] = 101
+        data['manual_layout_json'] = json.dumps(edits)
+        response = self.client.post('/layout/validate/', data)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn(b'Cargo units overlap.', response.content)

@@ -243,6 +243,17 @@ def validate_with_allowances(result, placements, source_items, allowances=None, 
             raise ManualLayoutError('wall_clearance', f"Keep cargo at least {config['wall_clearance_mm']} mm from the side/end walls.", [edit['item_id']])
         edit['x'] -= config['wall_clearance_mm']
         edit['y'] -= config['wall_clearance_mm']
-    checked = validate_manual_layout(engine, edits, source_items=transformed)
+    try:
+        checked = validate_manual_layout(engine, edits, source_items=transformed)
+    except ManualLayoutError as exc:
+        # Measured cargo geometry already passed above. This second pass checks
+        # enlarged planning envelopes plus the requested horizontal gap.
+        if exc.code == 'overlap':
+            raise ManualLayoutError(
+                'planning_clearance_overlap',
+                'Tolerance envelopes overlap or the required horizontal inter-cargo gap is not maintained. '
+                'Measured cargo boxes may still be separate.',
+                exc.item_ids) from None
+        raise
     restored = _restore(checked, source, result['container'], config)
     return _validate_combined(restored, allocation, config) if allocation is not None else restored
