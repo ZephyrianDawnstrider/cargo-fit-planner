@@ -169,6 +169,12 @@
         <iframe id="vf-frame" title="VesselFinder third-party vessel map" sandbox="allow-scripts allow-popups" referrerpolicy="no-referrer" style="width:100%;height:470px;border:0" hidden></iframe>
         {% else %}<p>Disabled on this deployment pending permission/usage-scope review. No VesselFinder scripts or maps are loaded.</p>{% endif %}
       </section>
+      <section aria-label="External vessel map"><h3>Open a ship map on VesselFinder</h3>
+        <p>Use the ship’s IMO number supplied by your logistics provider. This opens VesselFinder in a new tab, outside this app. Check the vessel identity and report time there; a valid number does not guarantee a matching vessel or current position.</p>
+        <form id="external-vessel-form"><label>IMO number for external map <input id="external-vessel-imo" inputmode="numeric" maxlength="20" autocomplete="off"></label><button type="submit">Prepare VesselFinder link</button></form>
+        <p id="external-vessel-status" role="status"></p><a id="external-vessel-link" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden>Open ship map on VesselFinder ↗</a>
+        <p class="subtle">Only clicking the link contacts VesselFinder with the IMO number and normal browser/network information. No cargo, quotes or shipment details are included. VesselFinder controls availability, data age, cookies and terms. No position is imported or inferred here; not for navigation.</p>
+      </section>
       <section><h3>Find a vessel or port</h3><p class="subtle">AIS status: {{ ais_status.status }}. Enter the ship name, IMO/MMSI supplied by your logistics provider, or a port code such as MYPKG. Select the matching identity before viewing details. No automatic container-to-vessel association is made.</p>
         <p class="note">{{ vessel_provider_coverage }}</p><form id="vessel-search-form" method="post" action="{% url 'vessel-search' %}">{% csrf_token %}<div class="toolbar"><label>Ship name, IMO, MMSI or port code <input name="query" maxlength="120" required></label><button>Search vessels / ports</button></div></form>
         <p id="vessel-feedback" role="status" aria-live="polite">{% if ais_status.status == 'unconfigured' %}Live vessel search needs a licensed provider connection.{% else %}A provider adapter is configured; available results depend on its coverage.{% endif %} No ship positions have been fetched.</p><ul id="vessel-matches"></ul>
@@ -246,6 +252,17 @@
   restoreCustomProfile();
   document.getElementById('cargo-form').addEventListener('submit',event=>{manualFeedback.hidden=true;try{source.value=sourceMode.value==='csv'?csvEditor.value:manualCsv();if(!source.value.trim())throw new Error('Add cargo or load a CSV before packing.');customJson.value=containerSelector.value==='custom_dry'?JSON.stringify(customProfileSnapshot()):'';}catch(error){event.preventDefault();manualFeedback.textContent=error.message;manualFeedback.hidden=false;manualFeedback.focus();}});
   rowBody.addEventListener('input',()=>{sourceMode.value='manual';}); rowBody.addEventListener('change',()=>{sourceMode.value='manual';}); csvEditor.addEventListener('input',()=>setCsvMode('CSV selected for packing.'));
+  const externalVesselForm=document.getElementById('external-vessel-form'),externalImo=document.getElementById('external-vessel-imo'),externalLink=document.getElementById('external-vessel-link'),externalStatus=document.getElementById('external-vessel-status');
+  function clearExternalVesselLink(){externalLink.hidden=true;externalLink.removeAttribute('href');externalStatus.textContent='';}
+  externalImo.addEventListener('input',clearExternalVesselLink);
+  externalVesselForm.addEventListener('submit',event=>{
+    event.preventDefault();clearExternalVesselLink();const imo=externalImo.value.trim();
+    if(!/^[0-9]{7}$/.test(imo)||[...imo.slice(0,6)].reduce((sum,digit,index)=>sum+Number(digit)*(7-index),0)%10!==Number(imo[6])||/^0+$/.test(imo)){
+      externalStatus.textContent='Enter a seven-digit IMO number with a valid check digit. Check the number with your logistics provider.';return;
+    }
+    externalLink.href='https://www.vesselfinder.com/?imo='+encodeURIComponent(imo);externalLink.hidden=false;
+    externalStatus.textContent='Link prepared for IMO '+imo+'. Vessel identity and position availability have not been checked by this app.';
+  });
   const vfForm=document.getElementById('vf-form');
   if(vfForm)vfForm.addEventListener('submit',event=>{event.preventDefault();const data=new FormData(vfForm),kind=data.get('kind'),identifier=String(data.get('identifier')||'').trim(),status=document.getElementById('vf-status'),frame=document.getElementById('vf-frame');if(!(kind==='imo'?/^[0-9]{7}$/:/^[0-9]{9}$/).test(identifier)){status.textContent='Enter a seven-digit IMO or nine-digit MMSI.';return;}const query=new URLSearchParams({kind,identifier,track:data.has('track')?'1':'0'});frame.src='{% url "vesselfinder-embed" %}?'+query.toString();frame.hidden=false;status.textContent='Requested third-party map. This app cannot verify whether a vessel position is available; inspect the widget timestamp. If blank or blocked, no position is inferred.';});
   const vesselForm=document.getElementById('vessel-search-form'),vesselFeedback=document.getElementById('vessel-feedback'),matches=document.getElementById('vessel-matches'),vesselDetails=document.getElementById('vessel-details'),mapFrame=document.getElementById('vessel-map'),mapButton=document.getElementById('vessel-map-button');
