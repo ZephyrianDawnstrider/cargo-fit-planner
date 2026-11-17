@@ -2,10 +2,13 @@
 
 from django.urls import path
 
-from optimization import mvp_views
+from optimization import mvp_views, multi_views
 from optimization.vessel_directory import name_directory
 
 urlpatterns = [
+    path("multi/", multi_views.index, name="multi-plan"),
+    path("multi/export/json/", multi_views.export_json, name="multi-export-json"),
+    path("multi/export/csv/", multi_views.export_csv, name="multi-export-csv"),
     path("", mvp_views.index, name="upload"),
     path("template.csv", mvp_views.demo_csv, name="cargo-template"),
     path("layout/validate/", mvp_views.validate_layout, name="validate-layout"),

@@ -59,6 +59,7 @@
 <body>
 <header><h1>Cargo Fit Planner</h1><p>Plan a container load from cargo you enter or paste · dimensions in millimetres · weights in kilograms</p></header>
 <main>
+<p><a class="button secondary" href="{% url 'multi-plan' %}">Plan successive containers</a> <span class="subtle">Separate bounded multi-load mode; this page keeps single-container editing and customer allocations.</span></p>
   <div class="hero"><div><strong>Single-container fit planning</strong><span>Choose a dry-box profile, enter gross load units, then review modeled placements and holds.</span></div><div><strong>{{ selected_profile.name }}</strong><span>{{ selected_profile.inside_mm.length }} × {{ selected_profile.inside_mm.width }} × {{ selected_profile.inside_mm.height }} mm inside · {{ selected_profile.max_payload_kg }} kg example payload · actual unit plate governs</span></div></div>
   <div class="workspace">
   <section class="panel entry-panel">
