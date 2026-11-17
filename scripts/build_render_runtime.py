@@ -22,6 +22,7 @@ ALLOWLIST = (
     "optimization/packing.py",
     "optimization/manual_layout.py",
     "optimization/allocation.py",
+    "optimization/allowances.py",
     "optimization/pricing.py",
     "optimization/vessels.py",
     "optimization/openwaters.py",
@@ -29,6 +30,7 @@ ALLOWLIST = (
     "optimization/templates/optimization/mvp.html",
     "optimization/templates/optimization/scene.js",
     "optimization/templates/optimization/allocation.js",
+    "optimization/templates/optimization/allowances.js",
 )
 
 

@@ -11,7 +11,7 @@ const el=(tag,attrs={},text=null)=>{const n=document.createElementNS(ns,tag);for
 function selection(){
  const p=packed.placed.find(p=>p.item_id===selected);controls.disabled=busy||!p;
  if(p){byId('manual-x').value=p.x;byId('manual-y').value=p.y;byId('manual-z').value=p.z;byId('manual-rotation').value=p.rotation_deg||0;}
- byId('selection-feedback').textContent=p?`${p.item_id} · ${p.name} · ${p.dx} × ${p.dy} × ${p.dz} mm · ${p.weight_kg} kg`:'No box selected. Click a box or its coordinate-table label.';
+ byId('selection-feedback').textContent=p?`${p.item_id} · ${p.name} · ${p.dx} × ${p.dy} × ${p.dz} mm · ${p.weight_kg} kg${p.planning_envelope_mm?' · dashed outline = tolerance envelope':''}`:'No box selected. Click a box or its coordinate-table label.';
  document.querySelectorAll('.cargo-row[data-item-id]').forEach(n=>n.classList.toggle('is-highlighted',n.dataset.itemId===selected));
  document.querySelectorAll('.item-link[data-item-id]').forEach(n=>n.setAttribute('aria-pressed',String(n.dataset.itemId===selected)));
 }
@@ -29,7 +29,7 @@ function draw(){
  const faces=[],faceIndices=[[0,1,2,3],[4,7,6,5],[0,4,5,1],[3,2,6,7],[0,3,7,4],[1,5,6,2]];
  function cube(points,id,color,shell=false){faceIndices.forEach((indices,index)=>{const pts=indices.map(i=>project(points[i]));faces.push({points:pts,id,color,shell,index,depth:pts.reduce((sum,p)=>sum+p[2],0)/4});});}
  cube(corners(0,0,0,c.length,c.width,c.height),null,'#7db8ce',true);
- packed.placed.forEach((p,i)=>cube(corners(p.x,p.y,p.z,p.dx,p.dy,p.dz),p.item_id,palette[i%palette.length]));
+ packed.placed.forEach((p,i)=>{cube(corners(p.x,p.y,p.z,p.dx,p.dy,p.dz),p.item_id,palette[i%palette.length]);});
  faces.sort((a,b)=>a.depth-b.depth).forEach(f=>{
   const n=el('polygon',{points:f.points.map(p=>p.slice(0,2).join(',')).join(' '),fill:f.color,'fill-opacity':f.shell?(f.index===0?.13:.045):.88,stroke:f.shell?'#5c91a8':f.id===selected?'#0e4e71':'#426373','stroke-opacity':f.shell?.6:.85,'stroke-width':f.id===selected?2.5:f.shell?1.1:.8});
   if(f.id){n.dataset.itemId=f.id;n.classList.add('box-face');n.append(el('title',{},f.id));}else n.style.pointerEvents='none';scene.append(n);
@@ -37,6 +37,8 @@ function draw(){
  // Distinct door plane at x=length; it is an illustration, not loading-path clearance.
  const door=corners(c.length,0,0,0,c.width,c.height),doorLine=el('polyline',{points:[door[0],door[3],door[7],door[4],door[0]].map(p=>project(p).slice(0,2).join(',')).join(' '),fill:'none',stroke:'#e39c39','stroke-width':2,'stroke-dasharray':'6 4'});doorLine.style.pointerEvents='none';scene.append(doorLine);
  const d=project([c.length,c.width/2,c.height]);scene.append(el('text',{x:d[0],y:d[1]-8,'text-anchor':'middle',fill:'#9e6618','font-size':12,'pointer-events':'none'},'DOOR END'));
+ // Tolerance envelope is not a load-bearing cargo surface.
+ packed.placed.forEach(p=>{const env=p.planning_envelope_mm;if(!env)return;const pts=corners(p.x,p.y,p.z,env.dx,env.dy,env.dz).map(project);[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]].forEach(([a,b])=>scene.append(el('line',{x1:pts[a][0],y1:pts[a][1],x2:pts[b][0],y2:pts[b][1],stroke:'#935b22','stroke-dasharray':'2 3','stroke-width':1,'pointer-events':'none'})));});
  // Reservation wireframes are planning regions, not physical partitions.
  (packed.allocation?.customers||[]).forEach((customer,index)=>{if(!customer.region)return;const b=customer.bounds_mm,pts=corners(b.x[0],b.y[0],b.z[0],b.x[1]-b.x[0],b.y[1]-b.y[0],b.z[1]-b.z[0]).map(project),color=palette[index%palette.length];[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]].forEach(([a,b])=>scene.append(el('line',{x1:pts[a][0],y1:pts[a][1],x2:pts[b][0],y2:pts[b][1],stroke:color,'stroke-width':1.7,'stroke-dasharray':'4 5','pointer-events':'none'})));const q=project([(b.x[0]+b.x[1])/2,(b.y[0]+b.y[1])/2,b.z[1]]);scene.append(el('text',{x:q[0],y:q[1]-18,fill:color,'font-size':12,'text-anchor':'middle','pointer-events':'none'},customer.id+' · reserved region'));});
  packed.placed.forEach(p=>{if(p.item_id!==selected&&packed.placed.length>12)return;const q=project([p.x+p.dx/2,p.y+p.dy/2,p.z+p.dz]);scene.append(el('text',{x:q[0],y:q[1]-3,'text-anchor':'middle','font-size':p.item_id===selected?13:10,fill:'#173648','pointer-events':'none'},p.item_id));});
