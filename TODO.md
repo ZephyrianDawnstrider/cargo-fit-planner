@@ -31,3 +31,22 @@ An isolated, stateless Render Docker/Blueprint candidate is being prepared with 
 ## 2026-10-03 — Native Python service path supersedes draft
 
 After manager confirmation that the selected Render workspace has no payment card attached and the human authorized a Free-only service, the deployment path is a native Python web service, not the unbuildable local Docker path. The source bundle is staged from an explicit allowlist; readiness and account/service creation evidence are appended to `docs/evidence/render-free-readiness-2026-10-03.md`. The earlier cloud-hold note records the state before this authorization and is preserved as historical.
+
+## 2026-11-17 — Current pipeline (older entries above are historical)
+
+Released through PR11: interactive single-container geometry/manual validation,
+customer mass/volume quotas and reserved regions, positive measured allowances,
+rated stacking, explicit DG/temperature review holds, floor/forklift UNVERIFIED
+notices, scoped user quotes, and incomplete ship-name identity search with an
+external VesselFinder link. No live AIS positions or compliance certification.
+
+Next candidate under development: bounded successive identical-container planning
+with one manifest, stable assignments, shared computational budget, special holds,
+per-load scoped estimates and CSV/JSON exports. Separate tabular mode initially;
+no batch 3D manual editor or customer quotas across containers.
+
+Still open: saved-plan reimport, batch 3D inspection/editing, customer allocations
+across multiple containers, carrier/equipment-specific operational validation.
+Live position/port integrations remain blocked on appropriate access/license/data
+scope. Do not silently enable providers, fabricate market rates or safety limits,
+publish ambiguous UN/LOCODE datasets, or delete original repository backups.

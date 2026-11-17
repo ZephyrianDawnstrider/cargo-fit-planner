@@ -666,7 +666,8 @@ def _mass_distribution(placed: list[dict[str, Any]], container: dict[str, Any]) 
 
 
 def pack_items(items: Iterable[dict[str, Any]], container_id: str = "20std", *,
-               custom_profile: dict[str, Any] | None = None) -> dict[str, Any]:
+               custom_profile: dict[str, Any] | None = None,
+               _candidate_budget: list[int] | None = None) -> dict[str, Any]:
     """Pack eligible units for one selected dry container profile.
 
     Dangerous-goods units are retained as manual-compliance holds and never
@@ -688,7 +689,12 @@ def pack_items(items: Iterable[dict[str, Any]], container_id: str = "20std", *,
     placed: list[dict[str, Any]] = []
     unplaced: list[dict[str, Any]] = []
     payload_grams = 0
-    candidate_budget = [MAX_CANDIDATE_CHECKS_PER_PACK]
+    if _candidate_budget is not None and (
+            not isinstance(_candidate_budget, list) or len(_candidate_budget) != 1
+            or type(_candidate_budget[0]) is not int
+            or not 0 <= _candidate_budget[0] <= MAX_CANDIDATE_CHECKS_PER_PACK):
+        raise ValueError('Internal shared candidate budget must be a bounded single integer counter')
+    candidate_budget = _candidate_budget if _candidate_budget is not None else [MAX_CANDIDATE_CHECKS_PER_PACK]
     search_exhausted = False
     for item in normalized:
         if item["is_dg"]:
