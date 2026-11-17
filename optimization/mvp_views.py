@@ -127,6 +127,7 @@ def index(request):
     context = {
         "csv_template": CSV_TEMPLATE,
         "demo_csv": DEMO_CSV,
+        "vessel_provider_coverage": getattr(getattr(settings, "VESSEL_DATA_PROVIDER", None), "coverage", ""),
         "vesselfinder_embed_enabled": getattr(settings, "VESSELFINDER_EMBED_ENABLED", False),
         "weather_enabled": getattr(settings, "WEATHER_FREE_API_ENABLED", False),
         "ais_status": ({"status": "provider_adapter_configured"} if getattr(settings, "VESSEL_DATA_PROVIDER", None) is not None else get_ais_status()),

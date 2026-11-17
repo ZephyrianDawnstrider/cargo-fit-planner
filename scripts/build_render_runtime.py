@@ -22,6 +22,7 @@ ALLOWLIST = (
     "optimization/packing.py",
     "optimization/pricing.py",
     "optimization/vessels.py",
+    "optimization/openwaters.py",
     "optimization/tracking.py",
     "optimization/templates/optimization/mvp.html",
 )

@@ -89,6 +89,8 @@ def _identity(raw):
         if value and (not value.isascii() or not value.isdigit() or (key=='imo' and len(value)!=7) or (key=='mmsi' and len(value)!=9)):
             raise ValueError('Invalid identity')
         item[key]=value
+    item['attribution']=_text(raw.get('attribution',''),2000,'attribution',True)
+    item['seen']=_text(raw.get('seen',''),80,'last heard',True)
     item['unlocode']=_text(raw.get('unlocode',''),5,'port code',True)
     return item
 

@@ -35,7 +35,7 @@ class RenderDeploymentSettingsTests(SimpleTestCase):
         self.assertNotIn("django.contrib.sessions.middleware.SessionMiddleware", module.MIDDLEWARE)
         self.assertNotIn("optimization.routers", module.DATABASE_ROUTERS)
         self.assertFalse(module.WEATHER_FREE_API_ENABLED)
-        self.assertEqual(module.DATA_UPLOAD_MAX_NUMBER_FIELDS, 16)
+        self.assertEqual(module.DATA_UPLOAD_MAX_NUMBER_FIELDS, 64)
         self.assertTrue(module.CSRF_COOKIE_SECURE)
         self.assertTrue(module.SECURE_SSL_REDIRECT)
         self.assertLess(module.MIDDLEWARE.index("optimization.admission.ComputeRateLimitMiddleware"), module.MIDDLEWARE.index("django.middleware.csrf.CsrfViewMiddleware"))
