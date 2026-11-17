@@ -394,7 +394,10 @@ def _apply_manual_snapshot(result, data):
     if len(raw) > 32000:
         raise ValueError("Manual layout snapshot is too large.")
     from .manual_layout import validate_manual_layout
-    placements = json.loads(raw)
+    try:
+        placements = json.loads(raw)
+    except RecursionError:
+        raise ValueError("Manual layout nesting is invalid.") from None
     return validate_manual_layout(result, placements, source_items=parse_csv(data.get("cargo_csv", "")))
 
 

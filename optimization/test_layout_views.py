@@ -26,7 +26,7 @@ class ManualLayoutViewTests(SimpleTestCase):
         for route in ['validate-layout','export-json','export-csv']:
             r=self.client.post(reverse(route),self.data());self.assertEqual(r.status_code,400)
     def test_reject_malformed_overlong_extra_or_missing_units(self):
-        for value in ['bad', '{}', '[]', 'x'*32001, json.dumps(self.edits[:-1]), json.dumps(self.edits+[self.edits[0]])]:
+        for value in ['bad', '{}', '[]', '['*2000+'0'+']'*2000, 'x'*32001, json.dumps(self.edits[:-1]), json.dumps(self.edits+[self.edits[0]])]:
             r=self.client.post(reverse('validate-layout'),{**self.base,'manual_layout_json':value})
             self.assertEqual(r.status_code,400)
     def test_server_source_authoritative_and_get_forbidden(self):
