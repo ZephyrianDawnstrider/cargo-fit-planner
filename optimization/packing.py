@@ -9,7 +9,7 @@ whole millimetres and weights in 0.001 kg increments. It models
 rectangular cargo (including explicitly entered palletized and drum/roll
 bounding boxes), straight-through door clearance, container containment,
 non-overlap, payload, floor-only placement, and conservative single-item
-full-footprint support with positive user-declared top-load ratings and cumulative descendant-load checks. Ratings are not independently verified or strength certification. Unknown/zero ratings cannot support cargo. Dangerous goods are held for manual compliance review.
+full-footprint support with positive user-declared top-load ratings and cumulative descendant-load checks. Ratings are not independently verified or strength certification. Unknown/zero ratings cannot support cargo. Dangerous goods are held for manual compliance review. Temperature-controlled cargo is held for specialist review; no reefer, temperature compatibility or safe range is inferred.
 It does not model load strength, lashing, axle/floor point loads, loading
 sequence/access after placement, or cargo-specific handling constraints.
 `palletized` dimensions and weight must include the entire palletized unit;
@@ -40,6 +40,7 @@ CSV_HEADERS = (
 )
 OPTIONAL_CSV_HEADERS = (
     "load_unit_type", "floor_only", "is_dg", "un_number", "imdg_class", "packing_group", "max_supported_load_kg", "stacking_rating_source",
+    "requires_temperature_control", "temperature_min_c", "temperature_max_c", "handling_source", "dg_declaration_reference",
 )
 LOAD_UNIT_TYPES = {"carton_crate", "palletized", "drum_roll"}
 MAX_CSV_BYTES = 1_000_000
@@ -272,6 +273,18 @@ def parse_csv(text: str) -> list[dict[str, Any]]:
                 dg_metadata[field] = value
                 if value and optional_flags.get("is_dg") is False:
                     add_error(row_number, field, "classification metadata requires is_dg=true")
+            temp_flag = False
+            if 'requires_temperature_control' in headers:
+                try:
+                    temp_flag = _parse_flag(row.get('requires_temperature_control') or '')
+                except ValueError as exc:
+                    add_error(row_number, 'requires_temperature_control', str(exc))
+            try:
+                special = _special_handling({**row, 'requires_temperature_control': temp_flag,
+                                             'is_dg': optional_flags.get('is_dg', False)})
+            except ValueError as exc:
+                add_error(row_number, 'special_handling', str(exc))
+                special = {}
             valid = bool(source_id and name and dimensions.keys() >= {"length_mm", "width_mm", "height_mm"}
                          and weight is not None and quantity and stackable is not None
                          and orientation in {"fixed", "yaw"} and load_unit_type in LOAD_UNIT_TYPES
@@ -294,6 +307,7 @@ def parse_csv(text: str) -> list[dict[str, Any]]:
                     "floor_only": optional_flags["floor_only"],
                     "is_dg": optional_flags["is_dg"],
                     **dg_metadata,
+                    **special,
                 })
         if truncated or errors:
             raise CsvValidationError(errors, truncated=truncated)
@@ -303,6 +317,42 @@ def parse_csv(text: str) -> list[dict[str, Any]]:
     except csv.Error as exc:
         add_error(reader.line_num or None, "csv", f"invalid CSV syntax: {exc}")
         raise CsvValidationError(errors, truncated=truncated) from exc
+
+
+def _special_handling(item):
+    flag = item.get('requires_temperature_control', False)
+    if not isinstance(flag, bool):
+        raise ValueError('requires_temperature_control must be boolean')
+    result = {'requires_temperature_control': flag}
+    for key in ('temperature_min_c', 'temperature_max_c'):
+        raw = item.get(key)
+        if raw is None or (isinstance(raw, str) and not raw.strip()):
+            result[key] = None
+        else:
+            if not flag:
+                raise ValueError(f'{key} requires requires_temperature_control=true')
+            result[key] = _finite_number(raw, key)
+    low, high = result['temperature_min_c'], result['temperature_max_c']
+    if low is not None and high is not None and low > high:
+        raise ValueError('temperature_min_c must not exceed temperature_max_c')
+    for key in ('handling_source', 'dg_declaration_reference'):
+        value = item.get(key, '')
+        if not isinstance(value, str) or len(value.strip()) > 200:
+            raise ValueError(f'{key} must be text up to 200 characters')
+        result[key] = value.strip()
+    if result['dg_declaration_reference'] and not item.get('is_dg', False):
+        raise ValueError('dg_declaration_reference requires is_dg=true')
+    return result
+
+
+def _hold_summary(unplaced):
+    """Exclusive hold-reason counts: DG takes priority for dual-flagged units."""
+    dg = sum(p.get('reason') == 'manual_compliance_hold' for p in unplaced)
+    temperature = sum(p.get('reason') == 'temperature_control_manual_hold' for p in unplaced)
+    return {'readiness': 'manual_compliance_hold' if dg or temperature else 'packing_preview_only',
+            'manual_compliance_hold_count': dg,
+            'temperature_control_manual_hold_count': temperature,
+            'manual_review_hold_count': dg + temperature}
 
 
 def _top_load(value):
@@ -385,6 +435,7 @@ def _validate_items(items: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
             data[field] = value.strip()
             if data[field] and not data["is_dg"]:
                 raise ValueError(f"item {item_id}: {field} requires is_dg=true")
+        data.update(_special_handling({**item, "is_dg": data["is_dg"]}))
         if "source_item_id" in item:
             data["source_item_id"] = str(item["source_item_id"])
         normalized.append(data)
@@ -637,13 +688,14 @@ def pack_items(items: Iterable[dict[str, Any]], container_id: str = "20std", *,
     placed: list[dict[str, Any]] = []
     unplaced: list[dict[str, Any]] = []
     payload_grams = 0
-    hold_count = 0
     candidate_budget = [MAX_CANDIDATE_CHECKS_PER_PACK]
     search_exhausted = False
     for item in normalized:
         if item["is_dg"]:
-            hold_count += 1
             unplaced.append({**item, "reason": "manual_compliance_hold"})
+            continue
+        if item['requires_temperature_control']:
+            unplaced.append({**item, 'reason': 'temperature_control_manual_hold'})
             continue
         # Reject an overweight item before converting kg to integer grams;
         # very large but finite values can overflow Python's float-to-int path.
@@ -672,18 +724,19 @@ def pack_items(items: Iterable[dict[str, Any]], container_id: str = "20std", *,
         placed.append({**item, **position, "rotation_deg": 90 if position["orientation"] == "yaw" else 0})
         payload_grams += item_grams
     _annotate_supported_loads(placed)
+    hold_summary = _hold_summary(unplaced)
     total_volume = sum(p["dx"] * p["dy"] * p["dz"] for p in placed) / 1_000_000_000
     return {
         "container": {**container, "inside_mm": dict(container["inside_mm"]), "door_mm": dict(container["door_mm"])},
         "placed": placed,
         "unplaced": unplaced,
         "mass_distribution": _mass_distribution(placed, container),
-        "readiness": "manual_compliance_hold" if hold_count else "packing_preview_only",
+        "readiness": hold_summary["readiness"],
         "totals": {
             "input_count": len(normalized),
             "placed_count": len(placed),
             "unplaced_count": len(unplaced),
-            "manual_compliance_hold_count": hold_count,
+            **{k: v for k, v in hold_summary.items() if k != "readiness"},
             "placed_weight_kg": payload_grams / 1000,
             "placed_volume_m3": total_volume,
         },

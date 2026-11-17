@@ -13,7 +13,7 @@ from copy import deepcopy
 import math
 from typing import Any
 
-from .packing import MAX_ITEMS, _mass_distribution, _overlap, _validate_items, _stacking_violation, _annotate_supported_loads
+from .packing import MAX_ITEMS, _mass_distribution, _overlap, _validate_items, _stacking_violation, _annotate_supported_loads, _hold_summary
 
 
 class ManualLayoutError(ValueError):
@@ -113,6 +113,8 @@ def validate_manual_layout(packing_result: dict[str, Any], placements: list[dict
         rules, edit = source_by_id[ident], edits[ident]
         if rules['is_dg']:
             _reject('manual_compliance_hold', 'Dangerous-goods cargo cannot be manually placed.', ident)
+        if rules['requires_temperature_control']:
+            _reject('temperature_control_manual_hold', 'Temperature-controlled cargo cannot be manually placed in this dry-box plan.', ident)
         rotate = edit['rotation_deg']
         if rotate == 90 and rules['orientation'] != 'yaw':
             _reject('orientation_not_allowed', 'This unit must retain its fixed orientation.', ident)
@@ -148,11 +150,11 @@ def validate_manual_layout(packing_result: dict[str, Any], placements: list[dict
         _reject('volume_limit', 'Placed cargo volume exceeds the container volume.')
     result = deepcopy(packing_result)
     result['placed'] = moved
-    hold_count = sum(p.get('is_dg', False) for p in unplaced)
-    result['readiness'] = 'manual_compliance_hold' if hold_count else 'packing_preview_only'
+    hold_summary = _hold_summary(unplaced)
+    result['readiness'] = hold_summary['readiness']
     result['totals'] = {**result.get('totals', {}), 'input_count': len(baseline),
                         'placed_count': len(moved), 'unplaced_count': len(unplaced),
-                        'manual_compliance_hold_count': hold_count,
+                        **{k:v for k,v in hold_summary.items() if k != 'readiness'},
                         'placed_weight_kg': grams / 1000, 'placed_volume_m3': volume_mm3 / 1_000_000_000}
     result['mass_distribution'] = _mass_distribution(moved, result['container'])
     result['manual_layout'] = {
