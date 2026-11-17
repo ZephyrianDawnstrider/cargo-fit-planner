@@ -373,3 +373,66 @@ class PackingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MassDistributionTests(unittest.TestCase):
+    def test_unequal_weights_use_mass_not_item_count(self):
+        result = pack_items([item('heavy', weight=30), item('light', weight=10)])
+        estimate = result['mass_distribution']
+        by_id = {p['item_id']: p for p in result['placed']}
+        self.assertEqual((by_id['heavy']['y'], by_id['light']['y']), (0, 400))
+        self.assertEqual(estimate['center_mm'], {'x': 250, 'y': 300, 'z': 150})
+        self.assertEqual(estimate['placed_mass_kg'], 40)
+        self.assertEqual(estimate['status'], 'estimated')
+        self.assertIn('uniform', estimate['basis'])
+        self.assertIn('Not a stability', estimate['notice'])
+        for axis, center in estimate['center_mm'].items():
+            bounds = estimate['coordinate_bounds_mm'][axis]
+            self.assertGreaterEqual(center, bounds['min'])
+            self.assertLessEqual(center, bounds['max'])
+            self.assertAlmostEqual(estimate['center_fraction'][axis], center / bounds['max'])
+            self.assertAlmostEqual(estimate['offset_from_midpoint_mm'][axis], center - bounds['max'] / 2)
+
+    def test_zero_mass_does_not_invent_geometric_center(self):
+        result = pack_items([item('massless', weight=0)])
+        estimate = result['mass_distribution']
+        self.assertEqual(estimate['status'], 'undefined_zero_placed_mass')
+        self.assertEqual(estimate['zero_mass_unit_count'], 1)
+        for field in ('center_mm', 'center_fraction', 'offset_from_midpoint_mm'):
+            self.assertIsNone(estimate[field])
+        json.dumps(result, allow_nan=False)
+
+    def test_no_placed_items_has_no_center(self):
+        result = pack_items([item('too-heavy', weight=1e308)])
+        self.assertEqual(result['mass_distribution']['placed_mass_kg'], 0)
+        self.assertIsNone(result['mass_distribution']['center_mm'])
+        self.assertEqual(result['mass_distribution']['zero_mass_unit_count'], 0)
+
+    def test_unplaced_and_manual_hold_weights_are_excluded(self):
+        items = [item('cargo', weight=10), item('overweight', weight=30000),
+                 {**item('held', weight=1000), 'is_dg': True}]
+        result = pack_items(items)
+        self.assertEqual(result['mass_distribution']['placed_mass_kg'], 10)
+        self.assertEqual(result['mass_distribution']['center_mm'], {'x': 250, 'y': 200, 'z': 150})
+
+    def test_zero_weight_units_do_not_bias_nonzero_mass(self):
+        result = pack_items([item('weight', weight=10), item('no-weight', weight=0)])
+        self.assertEqual(result['mass_distribution']['center_mm'], {'x': 250, 'y': 200, 'z': 150})
+        self.assertEqual(result['mass_distribution']['zero_mass_unit_count'], 1)
+
+    def test_quantities_and_gram_precision_are_accounted_for(self):
+        source = ('item_id,name,length_mm,width_mm,height_mm,weight_kg,quantity,stackable,orientation\n'
+                  'A,Cargo,500,400,300,0.001,3,true,fixed\n')
+        result = pack_items(parse_csv(source))
+        self.assertEqual(result['mass_distribution']['placed_mass_kg'], .003)
+        self.assertEqual(result['mass_distribution']['center_mm'], {'x': 250, 'y': 600, 'z': 150})
+        self.assertEqual(result, pack_items(parse_csv(source)))
+
+    def test_stacking_height_and_half_millimeter_centers(self):
+        # Full-footprint base leaves no second floor location; the second unit stacks.
+        result = pack_items([item('base', length=5801, width=2301, height=501, weight=30),
+                             item('top', length=5801, width=2301, height=499, weight=10)])
+        self.assertEqual(len(result['placed']), 2)
+        self.assertEqual(result['mass_distribution']['center_mm'],
+                         {'x': 2900.5, 'y': 1150.5, 'z': 375.5})
+        json.dumps(result, allow_nan=False)

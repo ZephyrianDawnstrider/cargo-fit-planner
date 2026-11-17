@@ -499,6 +499,43 @@ def _candidate(item: dict[str, Any], placed: list[dict[str, Any]], budget: list[
     return None, False
 
 
+def _mass_distribution(placed: list[dict[str, Any]], container: dict[str, Any]) -> dict[str, Any]:
+    """Estimate cargo-only centroid from placed gross weights and box centres.
+
+    Each load unit is assumed to have uniform mass distribution. Equipment tare,
+    actual internal centres of mass and forces during transport are not modeled.
+    Integer gram / half-millimetre moments avoid introducing an unweighted or
+    cumulative floating-point centroid. This diagnostic does not change packing.
+    """
+    inside = container["inside_mm"]
+    sizes = dict(x=inside["length"], y=inside["width"], z=inside["height"])
+    midpoint = {axis: size / 2 for axis, size in sizes.items()}
+    masses = [int(round(p["weight_kg"] * 1000)) for p in placed]
+    total_grams = sum(masses)
+    center = None
+    if total_grams:
+        center = {
+            axis: sum(mass * (2 * int(p[axis]) + int(p[extent]))
+                      for mass, p in zip(masses, placed)) / (2 * total_grams)
+            for axis, extent in (("x", "dx"), ("y", "dy"), ("z", "dz"))
+        }
+    return {
+        "status": "estimated" if total_grams else "undefined_zero_placed_mass",
+        "basis": "placed_cargo_only_uniform_mass_per_load_unit",
+        "coordinate_frame": "Same container-corner origin and axes as placements; x=length, y=width, z=height above floor.",
+        "coordinate_bounds_mm": {axis: {"min": 0, "max": size} for axis, size in sizes.items()},
+        "placed_mass_kg": total_grams / 1000,
+        "zero_mass_unit_count": sum(mass == 0 for mass in masses),
+        "center_mm": center,
+        "container_midpoint_mm": midpoint,
+        "offset_from_midpoint_mm": ({axis: center[axis] - midpoint[axis] for axis in sizes}
+                                    if center is not None else None),
+        "center_fraction": ({axis: center[axis] / sizes[axis] for axis in sizes}
+                            if center is not None else None),
+        "notice": "Cargo-only estimate assuming each entered gross load-unit mass is uniformly distributed. Not a stability, axle-load, floor-load, securing or transport-safety approval. Container tare is excluded; zero-mass units contribute no weight. No centre is reported when placed mass is zero.",
+    }
+
+
 def pack_items(items: Iterable[dict[str, Any]], container_id: str = "20std", *,
                custom_profile: dict[str, Any] | None = None) -> dict[str, Any]:
     """Pack eligible units for one selected dry container profile.
@@ -561,6 +598,7 @@ def pack_items(items: Iterable[dict[str, Any]], container_id: str = "20std", *,
         "container": {**container, "inside_mm": dict(container["inside_mm"]), "door_mm": dict(container["door_mm"])},
         "placed": placed,
         "unplaced": unplaced,
+        "mass_distribution": _mass_distribution(placed, container),
         "readiness": "manual_compliance_hold" if hold_count else "packing_preview_only",
         "totals": {
             "input_count": len(normalized),

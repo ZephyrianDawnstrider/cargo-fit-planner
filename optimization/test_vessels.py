@@ -1,0 +1,53 @@
+from copy import deepcopy
+from datetime import datetime,timezone,timedelta
+from unittest.mock import Mock
+from django.test import SimpleTestCase,override_settings
+from django.urls import reverse
+from . import vessels
+from .tracking import TrackingError
+
+class VesselBoundaryTests(SimpleTestCase):
+    def setUp(self):
+        self.adapter=Mock()
+        self.identity={'id':'ship:demo','kind':'vessel','name':'Synthetic Vessel','imo':'9074729','mmsi':'123456789'}
+        self.details={**self.identity,'source_name':'Synthetic fixture only','source_url':'https://example.com','position':{'latitude':0,'longitude':0,'observed_at':(datetime.now(timezone.utc)-timedelta(minutes=34)).isoformat()},'speed_knots':0,'course_degrees':None,'draught_m':None}
+        self.adapter.search.return_value={'results':[self.identity],'coverage':'Synthetic test coverage only'}
+        self.adapter.detail.return_value=self.details
+    def test_no_provider_is_explicit_never_invents_positions(self):
+        with override_settings(VESSEL_DATA_PROVIDER=None):
+            r=self.client.post(reverse('vessel-search'),{'query':'Any Vessel'})
+            self.assertEqual(r.status_code,503);self.assertEqual(r.json()['error']['code'],'vessel_provider_unconfigured')
+            self.assertIn('no-store',r['Cache-Control'])
+            self.assertEqual(self.client.get(reverse('vessel-search')).status_code,405)
+    def test_search_select_details(self):
+        with override_settings(VESSEL_DATA_PROVIDER=self.adapter):
+            r=self.client.post(reverse('vessel-search'),{'query':'Synthetic Vessel'})
+            self.assertEqual(r.json()['results'][0]['imo'],'9074729')
+            d=self.client.post(reverse('vessel-detail'),{'identifier':'ship:demo'}).json()
+            self.assertEqual(d['speed_knots'],0);self.assertIsNone(d['course_degrees']);self.assertFalse(d['position']['stale'])
+            self.assertEqual(d['position']['latitude'],0)
+    def test_port_search_is_not_vessel_identity(self):
+        self.adapter.search.return_value={'results':[{'id':'port:MYPKG','kind':'port','name':'Port Klang','unlocode':'MYPKG'}],'coverage':'Test port fixture'}
+        with override_settings(VESSEL_DATA_PROVIDER=self.adapter):
+            r=vessels.search('MYPKG');self.assertEqual(r['results'][0]['kind'],'port')
+    def test_stale_and_missing_position(self):
+        with override_settings(VESSEL_DATA_PROVIDER=self.adapter):
+            self.details['position']['observed_at']=(datetime.now(timezone.utc)-timedelta(hours=2)).isoformat()
+            self.assertTrue(vessels.detail('ship:demo')['position']['stale'])
+            self.details['position']=None;self.assertIsNone(vessels.detail('ship:demo')['position'])
+    def test_invalid_upstream_never_reaches_display(self):
+        changes=[{'source_url':'javascript:alert(1)'},{'id':'different'}, {'speed_knots':float('nan')},{'position':{'latitude':999,'longitude':0,'observed_at':'2026-01-01'}}, {'position':{'latitude':0,'longitude':0,'observed_at':(datetime.now(timezone.utc)+timedelta(hours=1)).isoformat()}}]
+        with override_settings(VESSEL_DATA_PROVIDER=self.adapter):
+            for change in changes:
+                self.adapter.detail.return_value={**deepcopy(self.details),**change}
+                with self.subTest(change=change),self.assertRaises(TrackingError):vessels.detail('ship:demo')
+    def test_invalid_query_no_adapter_call_and_errors_sanitized(self):
+        with override_settings(VESSEL_DATA_PROVIDER=self.adapter):
+            for q in ['', 'x'*121, 'bad\x00query']:
+                with self.assertRaises(TrackingError):vessels.search(q)
+            self.adapter.search.assert_not_called()
+            self.adapter.search.side_effect=RuntimeError('secret upstream token')
+            r=self.client.post(reverse('vessel-search'),{'query':'ship'});self.assertNotContains(r,'secret',status_code=502)
+    def test_name_not_html_interpolated_in_ui(self):
+        r=self.client.get(reverse('upload'));self.assertContains(r,"document.createElement('button')")
+        self.assertContains(r,'No automatic container-to-vessel association')

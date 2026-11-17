@@ -76,3 +76,19 @@ python manage.py test optimization.test_mvp_views optimization.test_packing --se
 ```
 
 `render.yaml` and the allowlist builder are the reproducible native-Python Blueprint path. They do not configure persistent storage or invoke deployment themselves. See the current readiness evidence in `docs/evidence/render-free-readiness-2026-10-03.md`.
+
+## Consolidation follow-up — 2026-11-17 (review branch, not deployed)
+
+Cargo Fit Planner is the active application. The five former Streamlit variants are preserved as complete verified Git bundles on the `relic/legacy-stuffing-20261117` branch. LoadVerse / `3dloder` is also fully backed up privately, because its history contains shipment-item records whose synthetic provenance is unverified. No original repository has been deleted. Archives do not belong in the allowlisted deployed runtime.
+
+The review branch adds:
+
+- **Editable scoped freight quotes:** enter amount, currency, trip/tonne/m³ basis, exact equipment, origin/destination, validity/shipment dates, source and included/excluded charges. Missing/expired/mismatched quotes remain unpriced. Pricing is independent of geometric allocation and applies only to placed cargo. No live-market or universal average is fabricated. The JSON preserves the quote; CSV repeats whole-load estimate fields on each item row, so they must not be summed.
+- **Cargo mass distribution:** a genuinely mass-weighted cargo-only centre, midpoint offsets and normalized position are exported. This assumes uniform density within each load unit; it excludes container/vehicle tare and is not axle-load, stability, strength, securing or dispatch certification. Zero placed mass gives unknown coordinates instead of a fictitious midpoint.
+- **Vessel/port search and selection boundary:** accepts a ship name, IMO/MMSI, or port code and keeps vessel/port result types distinct. Selecting a result can show provider-attributed identity, position observation time/age/stale status, reported voyage/ETA and speed/course/draught. Missing data stays unknown. The map is opened explicitly and reflects the reported observation, not a refreshed live position. No photographer images are copied.
+
+**Live vessel data is NOT connected.** The default returns a clear unavailable-provider response and makes no vessel request. A trusted server-side provider implementing `search(query, limit=20)` and `detail(identifier)` must first be licensed for directory lookup, position data and public display, and must implement bounded fixed-host transport, secure credentials and quota controls. Set `VESSEL_DATA_PROVIDER` only through reviewed application configuration, never arbitrary user input. MarineTraffic API access is separate from a website subscription; AISStream alone does not guarantee instant global name search or last-known position coverage. There is no scraper or simulated-live fallback.
+
+An optional displayed position uses an [OpenStreetMap embedded map](https://wiki.openstreetmap.org/wiki/Export#Embeddable_HTML) only after clicking the map button; the button discloses that the reported coordinates will be sent to OpenStreetMap. Data attribution is displayed. Coordinates above 85° latitude remain in the detail card without this Mercator map. Vessel position does not establish container association. User-obtained ship identity and the provider's coverage/licensing govern what can be shown.
+
+Validation: 104 backend/view/packing/provider-boundary tests pass with synthetic provider fixtures and no live vessel calls. Rendered JavaScript syntax and Django checks pass. Real-browser interaction and live provider/deployment verification remain outstanding because browser access and Render reauthentication are blocked in the current environment. Do not represent this review branch as deployed or as globally available vessel tracking.

@@ -9,6 +9,8 @@ urlpatterns = [
     path("template.csv", mvp_views.demo_csv, name="cargo-template"),
     path("export/csv/", mvp_views.export_csv, name="export-csv"),
     path("export/json/", mvp_views.export_json, name="export-json"),
+    path("vessels/search/", mvp_views.vessel_search, name="vessel-search"),
+    path("vessels/detail/", mvp_views.vessel_detail, name="vessel-detail"),
     path("weather/", mvp_views.marine_forecast, name="marine-forecast"),
     path("healthz", mvp_views.healthz, name="healthz"),
 ]
