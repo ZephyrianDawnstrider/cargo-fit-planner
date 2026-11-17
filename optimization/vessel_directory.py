@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 import gzip
 import io
 import json
+import logging
 import re
 import threading
 import time
@@ -45,6 +46,23 @@ _daily_requests = 0
 _cooldown_until = 0
 
 
+_logger = logging.getLogger(__name__)
+
+
+def _diagnostic(exc, stage, *, status=None, content_type='unknown', encoding='unknown', size=None):
+    """Allowlisted operational categories only: no exception text, URLs or cargo/query data."""
+    allowed = {'HTTPError', 'URLError', 'gaierror', 'TimeoutError', 'ConnectionRefusedError',
+               'ConnectionResetError', 'SSLError', 'SSLCertVerificationError', 'OSError',
+               'EOFError', 'BadGzipFile', 'error', 'JSONDecodeError', 'UnicodeDecodeError',
+               'ValueError', 'TypeError', 'RecursionError', 'OverflowError', 'AttributeError', 'KeyError'}
+    kind = type(exc).__name__
+    reason = type(exc.reason).__name__ if isinstance(exc, URLError) else 'none'
+    _logger.warning('Vessel directory failure stage=%s exception=%s reason_type=%s status=%s content_type=%s encoding=%s bytes=%s',
+                    stage, kind if kind in allowed else 'other', reason if reason in allowed else ('none' if reason == 'none' else 'other'),
+                    status if type(status) is int else None, content_type, encoding,
+                    size if type(size) is int else None)
+
+
 class _NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         raise TrackingError('directory_unavailable', 'The vessel name directory is temporarily unavailable.')
@@ -61,29 +79,41 @@ def _request_json(params):
     request = Request(ENDPOINT + '?' + urlencode({**params, 'format': 'json', 'maxlag': '5'}),
                       headers={'User-Agent': 'CargoFitPlanner/1.0 (https://github.com/ZephyrianDawnstrider/cargo-fit-planner)',
                                'Accept': 'application/json', 'Accept-Encoding': 'gzip'})
+    stage, status, content_type, encoding, size = 'connect', None, 'unknown', 'unknown', None
     try:
         with build_opener(ProxyHandler({}), _NoRedirect()).open(request, timeout=TIMEOUT_SECONDS) as response:
+            stage = 'read'
+            status = getattr(response, 'status', None)
+            raw_type = response.headers.get('Content-Type', '').split(';', 1)[0].strip().lower()
+            content_type = raw_type if raw_type in ('application/json', 'text/html', 'text/plain') else 'other'
+            raw_encoding = response.headers.get('Content-Encoding', '').lower()
+            encoding = raw_encoding if raw_encoding in ('gzip', 'identity', '') else 'other'
             raw = response.read(MAX_RESPONSE_BYTES + 1)
+            size = len(raw)
             if len(raw) > MAX_RESPONSE_BYTES:
                 raise ValueError('oversized')
-            encoding = response.headers.get('Content-Encoding', '').lower()
             if encoding == 'gzip':
+                stage = 'decompress'
                 raw = gzip.GzipFile(fileobj=io.BytesIO(raw)).read(MAX_RESPONSE_BYTES + 1)
             elif encoding not in ('', 'identity'):
                 raise ValueError('encoding')
             if len(raw) > MAX_RESPONSE_BYTES:
                 raise ValueError('oversized')
+            stage = 'json'
             data = json.loads(raw)
+            stage = 'api'
             if not isinstance(data, dict) or data.get('error') or data.get('success') == 0:
                 raise ValueError('invalid API response')
             return data
     except HTTPError as exc:
+        _diagnostic(exc, stage, status=exc.code, content_type=content_type, encoding=encoding, size=size)
         if exc.code in (429, 503):
             retry = exc.headers.get('Retry-After', '') if exc.headers else ''
             delay = min(3600, max(60, int(retry))) if retry.isascii() and retry.isdigit() and len(retry) < 8 else 300
             _cooldown_until = time.monotonic() + delay
         raise TrackingError('directory_unavailable', 'The vessel name directory is temporarily unavailable. Try later.') from None
-    except (URLError, OSError, EOFError, zlib.error, ValueError, TypeError, RecursionError, OverflowError):
+    except (URLError, OSError, EOFError, zlib.error, ValueError, TypeError, RecursionError, OverflowError) as exc:
+        _diagnostic(exc, stage, status=status, content_type=content_type, encoding=encoding, size=size)
         _cooldown_until = max(_cooldown_until, time.monotonic() + 60)
         raise TrackingError('directory_unavailable', 'The vessel name directory could not return valid results. Try later.') from None
 
@@ -180,7 +210,8 @@ def search(query):
             result = _lookup(query)
         except TrackingError:
             raise
-        except (ValueError, TypeError, KeyError, AttributeError, OverflowError, RecursionError):
+        except (ValueError, TypeError, KeyError, AttributeError, OverflowError, RecursionError) as exc:
+            _diagnostic(exc, 'schema')
             _cooldown_until = time.monotonic() + 60
             raise TrackingError('directory_unavailable', 'The vessel name directory returned invalid results. Try later.') from None
         _cache[key] = (time.monotonic(), deepcopy(result))

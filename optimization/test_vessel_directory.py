@@ -123,6 +123,27 @@ class DirectoryTests(SimpleTestCase):
             self.assertEqual(ctx.exception.code,'directory_busy')
         finally:directory._lock.release()
 
+    def test_dns_diagnostics_class_only_no_exception_text(self):
+        import socket
+        opener=Mock();opener.open.side_effect=URLError(socket.gaierror(-3,'private query and hostname'))
+        with patch.object(directory,'build_opener',return_value=opener),self.assertLogs(directory.__name__,level='WARNING') as logs:
+            with self.assertRaises(TrackingError):directory._request_json({'search':'SECRET-SHIP'})
+        text=' '.join(logs.output)
+        self.assertIn('stage=connect',text);self.assertIn('reason_type=gaierror',text)
+        self.assertNotIn('private',text);self.assertNotIn('SECRET-SHIP',text);self.assertNotIn('wikidata.org',text)
+
+    def test_html_diagnostics_redact_body_and_headers(self):
+        response=Mock();response.status=200
+        response.headers={'Content-Type':'text/html; private=value','Content-Encoding':''}
+        response.read.return_value=b'<html>private query secret challenge content</html>'
+        opener=Mock();opener.open.return_value.__enter__=Mock(return_value=response);opener.open.return_value.__exit__=Mock(return_value=False)
+        with patch.object(directory,'build_opener',return_value=opener),self.assertLogs(directory.__name__,level='WARNING') as logs:
+            with self.assertRaises(TrackingError):directory._request_json({'search':'SECRET-SHIP'})
+        text=' '.join(logs.output)
+        self.assertIn('stage=json',text);self.assertIn('exception=JSONDecodeError',text)
+        self.assertIn('status=200 content_type=text/html',text)
+        self.assertNotIn('private',text);self.assertNotIn('SECRET-SHIP',text);self.assertNotIn('challenge',text)
+
     def test_corrupt_deflate_error_sanitized(self):
         import zlib
         response=Mock();response.read.return_value=b'fake';response.headers={'Content-Encoding':'gzip'}
