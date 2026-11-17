@@ -81,13 +81,28 @@ def _allocation_data(data):
         raise ValueError("Allocation settings are invalid.") from None
 
 
-def _pack_source(source, container_id="20std", custom_profile=None, allocation=None):
+def _allowances_data(data):
+    raw = data.get("allowances_json", "").strip()
+    if not raw:
+        return None
+    if len(raw) > 2048:
+        raise ValueError("Planning allowance settings are too large.")
+    try:
+        value = json.loads(raw)
+        if not isinstance(value, dict):
+            raise ValueError
+        return value
+    except (ValueError, TypeError, RecursionError):
+        raise ValueError("Planning allowance settings are invalid.") from None
+
+
+def _pack_source(source, container_id="20std", custom_profile=None, allocation=None, allowances=None):
     if _source_too_large(source):
         raise ValueError("CSV is too large. Keep uploads under 256 KiB.")
     if container_id not in CONTAINERS and container_id != "custom_dry":
         raise ValueError("Select one of the listed container profile examples.")
-    from .allocation import pack_allocated
-    return pack_allocated(parse_csv(source), container_id=container_id, custom_profile=custom_profile, config=allocation)
+    from .allowances import pack_with_allowances
+    return pack_with_allowances(parse_csv(source), container_id=container_id, custom_profile=custom_profile, allocation=allocation, allowances=allowances)
 
 
 def _shipment_data(data):
@@ -156,6 +171,7 @@ def index(request):
         "quote_fields": RATE_FIELDS,
         "custom_profile_json": "",
         "allocation_json": "",
+        "allowances_json": "",
         "custom_selected": False,
     }
     if request.method == "POST":
@@ -166,6 +182,7 @@ def index(request):
         custom_profile_json = request.POST.get("custom_profile_json", "")
         context["custom_profile_json"] = custom_profile_json
         context["allocation_json"] = request.POST.get("allocation_json", "")
+        context["allowances_json"] = request.POST.get("allowances_json", "")
         context["custom_selected"] = selected_container_id == "custom_dry"
         try:
             shipment = _shipment_data(request.POST)
@@ -191,7 +208,7 @@ def index(request):
             items = parse_csv(source)
             if selected_container_id not in CONTAINERS and selected_container_id != "custom_dry":
                 raise ValueError("Select one of the listed container profile examples.")
-            result = _pack_source(source, selected_container_id, custom_profile, _allocation_data(request.POST))
+            result = _pack_source(source, selected_container_id, custom_profile, _allocation_data(request.POST), _allowances_data(request.POST))
             result["pricing"] = estimate(result, shipment, quote)
         except CsvValidationError as exc:
             context.update({
@@ -237,13 +254,14 @@ def export_csv(request):
         container_id = request.POST.get("container_id", "20std").strip()
         shipment = _shipment_data(request.POST)
         custom_profile = _custom_profile_data(request.POST, container_id)
-        result = _pack_source(request.POST.get("cargo_csv", ""), container_id, custom_profile, _allocation_data(request.POST))
+        result = _pack_source(request.POST.get("cargo_csv", ""), container_id, custom_profile, _allocation_data(request.POST), _allowances_data(request.POST))
         result = _apply_manual_snapshot(result, request.POST)
         result["pricing"] = estimate(result, shipment, quote_fields(request.POST))
         output = io.StringIO(newline="")
         fields = [
             "item_id", "source_item_id", "customer_id", "name", "status", "reason",
             "x", "y", "z", "dx", "dy", "dz",
+            "planning_envelope_dx_mm", "planning_envelope_dy_mm", "planning_envelope_dz_mm", "planning_allowances_json",
             "length_mm", "width_mm", "height_mm", "weight_kg", "stackable",
             "orientation", "rotation_deg", "load_unit_type", "floor_only", "is_dg",
             "un_number", "imdg_class", "packing_group", "readiness", "container_id", "container_name",
@@ -257,6 +275,7 @@ def export_csv(request):
         profile = result["container"]
         export_profile = {
             "container_id": profile["id"], "container_name": profile["name"],
+            "planning_allowances_json": json.dumps(result.get("allowances", {}), ensure_ascii=False),
             "whole_load_cost_estimate": result["pricing"]["amount"],
             "cost_currency": result["pricing"]["currency"], "cost_status": result["pricing"]["status"],
             "profile_length_mm": profile["inside_mm"]["length"],
@@ -277,6 +296,7 @@ def export_csv(request):
         for status in ("placed", "unplaced"):
             for item in result.get(status, []):
                 writer.writerow(_safe_csv_row({**item, "status": status,
+                                               **{f"planning_envelope_{axis}_mm": item.get("planning_envelope_mm", {}).get(axis, "") for axis in ("dx", "dy", "dz")},
                                                "readiness": result.get("readiness", "packing_preview_only"),
                                                **export_profile, **shipment}))
         response = HttpResponse(output.getvalue(), content_type="text/csv; charset=utf-8")
@@ -297,7 +317,7 @@ def export_json(request):
         container_id = request.POST.get("container_id", "20std").strip()
         shipment = _shipment_data(request.POST)
         custom_profile = _custom_profile_data(request.POST, container_id)
-        result = _pack_source(request.POST.get("cargo_csv", ""), container_id, custom_profile, _allocation_data(request.POST))
+        result = _pack_source(request.POST.get("cargo_csv", ""), container_id, custom_profile, _allocation_data(request.POST), _allowances_data(request.POST))
         result = _apply_manual_snapshot(result, request.POST)
         result["pricing"] = estimate(result, shipment, quote_fields(request.POST))
         result["shipment"] = shipment
@@ -416,10 +436,10 @@ def _apply_manual_snapshot(result, data):
         placements = json.loads(raw)
     except RecursionError:
         raise ValueError("Manual layout nesting is invalid.") from None
-    updated = validate_manual_layout(result, placements, source_items=parse_csv(data.get("cargo_csv", "")))
-    from .allocation import validate_allocation
-    config = _allocation_data(data)
-    return validate_allocation(updated, config) if config is not None else updated
+    from .allowances import validate_with_allowances
+    return validate_with_allowances(result, placements, source_items=parse_csv(data.get("cargo_csv", "")),
+                                    allowances=_allowances_data(data), allocation=_allocation_data(data))
+
 
 
 @require_POST
@@ -431,7 +451,7 @@ def validate_layout(request):
     try:
         container_id = request.POST.get("container_id", "20std").strip()
         custom = _custom_profile_data(request.POST, container_id)
-        result = _pack_source(request.POST.get("cargo_csv", ""), container_id, custom, _allocation_data(request.POST))
+        result = _pack_source(request.POST.get("cargo_csv", ""), container_id, custom, _allocation_data(request.POST), _allowances_data(request.POST))
         if not request.POST.get("manual_layout_json"):
             raise ValueError("Provide a complete manual layout snapshot.")
         result = _apply_manual_snapshot(result, request.POST)
