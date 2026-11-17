@@ -74,10 +74,16 @@ def valid_imo(value):
             and sum(int(digit) * weight for digit, weight in zip(value[:6], range(7, 1, -1))) % 10 == int(value[-1]))
 
 
-def _request_json(params):
+def _request_json(params, *, interactive=False):
     global _daily_requests, _cooldown_until
     _daily_requests += 1  # Attempt, including failure. Called only under search lock.
-    request = Request(ENDPOINT + '?' + urlencode({**params, 'format': 'json', 'maxlag': '5'}),
+    # Official policy permits omission only for user-waiting interactive work:
+    # https://www.mediawiki.org/wiki/Manual:Maxlag_parameter
+    parameters = {**params, 'format': 'json'}
+    parameters.pop('maxlag', None)
+    if interactive is not True:
+        parameters['maxlag'] = '5'
+    request = Request(ENDPOINT + '?' + urlencode(parameters),
                       headers={'User-Agent': 'CargoFitPlanner/1.0 (https://github.com/ZephyrianDawnstrider/cargo-fit-planner)',
                                'Accept': 'application/json', 'Accept-Encoding': 'gzip'})
     stage, status, content_type, encoding, size = 'connect', None, 'unknown', 'unknown', None
@@ -133,9 +139,9 @@ def _text(value, limit):
     return value.strip()
 
 
-def _lookup(query):
+def _lookup(query, *, interactive=False):
     response = _request_json({'action': 'wbsearchentities', 'search': query, 'language': 'en',
-                              'uselang': 'en', 'type': 'item', 'limit': str(MAX_CANDIDATES)})
+                              'uselang': 'en', 'type': 'item', 'limit': str(MAX_CANDIDATES)}, interactive=interactive)
     records = response.get('search')
     if not isinstance(records, list) or len(records) > MAX_CANDIDATES:
         raise ValueError('invalid search response')
@@ -151,7 +157,7 @@ def _lookup(query):
     results = []
     if matches:
         data = _request_json({'action': 'wbgetentities', 'ids': '|'.join(matches),
-                              'props': 'labels|descriptions|claims', 'languages': 'en'})
+                              'props': 'labels|descriptions|claims', 'languages': 'en'}, interactive=interactive)
         entities = data.get('entities')
         if not isinstance(entities, dict) or len(entities) > MAX_CANDIDATES:
             raise ValueError('invalid entities')
@@ -187,7 +193,7 @@ def _lookup(query):
             'retrieved_at': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')}
 
 
-def search(query):
+def search(query, *, interactive=False):
     global _last_attempt, _daily_date, _daily_requests, _cooldown_until
     try:
         query = _text(query, 120)
@@ -216,7 +222,7 @@ def search(query):
             raise TrackingError('directory_daily_budget', 'The name-directory request allowance is exhausted for today (UTC).', 429)
         _last_attempt = now
         try:
-            result = _lookup(query)
+            result = _lookup(query, interactive=interactive)
         except TrackingError:
             raise
         except (ValueError, TypeError, KeyError, AttributeError, OverflowError, RecursionError) as exc:
@@ -235,6 +241,6 @@ def search(query):
 @never_cache
 def name_directory(request):
     try:
-        return JsonResponse(search(request.POST.get('query', '')))
+        return JsonResponse(search(request.POST.get('query', ''), interactive=True))
     except TrackingError as exc:
         return JsonResponse({'error': {'code': exc.code, 'message': exc.message}}, status=exc.status)

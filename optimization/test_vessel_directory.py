@@ -98,7 +98,7 @@ class DirectoryTests(SimpleTestCase):
         self.assertNotIn('private upstream',response.content.decode())
         req=opener.open.call_args.args[0]
         self.assertTrue(req.full_url.startswith(directory.ENDPOINT+'?'))
-        self.assertIn('maxlag=5',req.full_url)
+        self.assertNotIn('maxlag=',req.full_url)
         self.assertEqual(opener.open.call_args.kwargs['timeout'],5)
         self.assertGreater(directory._cooldown_until,0)
 
@@ -122,6 +122,32 @@ class DirectoryTests(SimpleTestCase):
             with self.assertRaises(TrackingError) as ctx:directory.search('fixture')
             self.assertEqual(ctx.exception.code,'directory_busy')
         finally:directory._lock.release()
+
+    def test_interactive_transport_omits_maxlag_background_default_has_five(self):
+        from urllib.parse import urlsplit, parse_qs
+        response=Mock();response.read.return_value=b'{"search":[]}';response.headers={}
+        opener=Mock();opener.open.return_value.__enter__=Mock(return_value=response);opener.open.return_value.__exit__=Mock(return_value=False)
+        with patch.object(directory,'build_opener',return_value=opener):
+            directory._request_json({'action':'wbsearchentities'})
+            params=parse_qs(urlsplit(opener.open.call_args.args[0].full_url).query)
+            self.assertEqual(params['maxlag'],['5'])
+            directory._request_json({'action':'wbsearchentities'},interactive=True)
+            params=parse_qs(urlsplit(opener.open.call_args.args[0].full_url).query)
+            self.assertNotIn('maxlag',params)
+
+    def test_interactive_flag_threaded_to_both_calls(self):
+        with patch.object(directory,'_request_json',side_effect=responses()) as fetch:
+            directory.search('fixture',interactive=True)
+        self.assertTrue(all(call.kwargs=={'interactive':True} for call in fetch.call_args_list))
+        directory._last_attempt=None;directory._cache.clear()
+        with patch.object(directory,'_request_json',side_effect=responses()) as fetch:
+            directory.search('fixture')
+        self.assertTrue(all(call.kwargs=={'interactive':False} for call in fetch.call_args_list))
+
+    def test_endpoint_interactive_not_controlled_by_form_flag(self):
+        with patch.object(directory,'search',return_value={'results':[]}) as search:
+            self.client.post(reverse('vessel-name-directory'),{'query':'fixture','interactive':'false'})
+        search.assert_called_once_with('fixture',interactive=True)
 
     def test_api_error_code_allowlisted_and_maxlag_cooldown(self):
         for code, expected in (('maxlag','maxlag'),('ratelimited','ratelimited'),('private-code','other')):

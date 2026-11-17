@@ -111,3 +111,9 @@ Only the submitted ship name is sent to Wikidata, not the cargo form. Transport 
 process-local cache and budgets protect the demo; they reset on process restart and
 are not global quotas. Public operational use still needs an appropriate position provider.
 Source and license: https://www.wikidata.org/wiki/Wikidata:Data_access
+
+The submitted name lookup is an interactive, user-waiting request. Per MediaWiki's
+[official maxlag guidance](https://www.mediawiki.org/wiki/Manual:Maxlag_parameter),
+only that path omits the optional `maxlag` parameter. Background/noninteractive
+calls retain `maxlag=5`. This does not disable request budgets, cooldowns, HTTP
+429/503 handling, caching or the no-retry policy.
