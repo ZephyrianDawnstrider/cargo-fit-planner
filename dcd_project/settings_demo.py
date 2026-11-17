@@ -14,7 +14,7 @@ ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 ROOT_URLCONF = "dcd_project.urls_demo"
 DATA_UPLOAD_MAX_MEMORY_SIZE = 300 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 300 * 1024
-DATA_UPLOAD_MAX_NUMBER_FIELDS = 16
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 64
 DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}}
 DATABASE_ROUTERS = []
 LOGGING = {
@@ -23,3 +23,8 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "root": {"handlers": ["console"], "level": "WARNING"},
 }
+
+# Explicit local personal-demo opt-in only; never enables production settings.
+if os.environ.get("CARGO_OPEN_WATERS_PERSONAL_DEMO", "").lower() == "true":
+    from optimization.openwaters import OpenWatersPersonalDemo
+    VESSEL_DATA_PROVIDER = OpenWatersPersonalDemo()

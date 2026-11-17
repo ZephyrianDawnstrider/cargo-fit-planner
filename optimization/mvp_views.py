@@ -3,6 +3,7 @@
 import csv
 import io
 import json
+import re
 import threading
 from decimal import Decimal
 
@@ -13,6 +14,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from .packing import CONTAINERS, CSV_TEMPLATE, DEMO_CSV, CsvValidationError, pack_items, parse_csv
+from .pricing import RATE_FIELDS, quote_fields, estimate
 from .tracking import TrackingError, get_ais_status, get_marine_forecast
 
 
@@ -125,13 +127,17 @@ def index(request):
     context = {
         "csv_template": CSV_TEMPLATE,
         "demo_csv": DEMO_CSV,
+        "vessel_provider_coverage": getattr(getattr(settings, "VESSEL_DATA_PROVIDER", None), "coverage", ""),
+        "vesselfinder_embed_enabled": getattr(settings, "VESSELFINDER_EMBED_ENABLED", False),
         "weather_enabled": getattr(settings, "WEATHER_FREE_API_ENABLED", False),
-        "ais_status": get_ais_status(),
+        "ais_status": ({"status": "provider_adapter_configured"} if getattr(settings, "VESSEL_DATA_PROVIDER", None) is not None else get_ais_status()),
         "container_choices": _container_choices(),
         "selected_container_id": "20std",
         "selected_profile": _selected_profile("20std"),
         "shipment": {field: "" for field in SHIPMENT_FIELDS},
         "shipment_fields": SHIPMENT_FIELDS,
+        "quote": {key: "" for key in RATE_FIELDS},
+        "quote_fields": RATE_FIELDS,
         "custom_profile_json": "",
         "custom_selected": False,
     }
@@ -145,6 +151,8 @@ def index(request):
         context["custom_selected"] = selected_container_id == "custom_dry"
         try:
             shipment = _shipment_data(request.POST)
+            quote = quote_fields(request.POST)
+            context["quote"] = quote
             custom_profile = _custom_profile_data(request.POST, selected_container_id)
             if custom_profile is not None:
                 context["selected_profile"] = custom_profile
@@ -166,6 +174,7 @@ def index(request):
             if selected_container_id not in CONTAINERS and selected_container_id != "custom_dry":
                 raise ValueError("Select one of the listed container profile examples.")
             result = pack_items(items, container_id=selected_container_id, custom_profile=custom_profile)
+            result["pricing"] = estimate(result, shipment, quote)
         except CsvValidationError as exc:
             context.update({
                 "cargo_csv": source,
@@ -211,6 +220,7 @@ def export_csv(request):
         shipment = _shipment_data(request.POST)
         custom_profile = _custom_profile_data(request.POST, container_id)
         result = _pack_source(request.POST.get("cargo_csv", ""), container_id, custom_profile)
+        result["pricing"] = estimate(result, shipment, quote_fields(request.POST))
         output = io.StringIO(newline="")
         fields = [
             "item_id", "source_item_id", "name", "status", "reason",
@@ -221,13 +231,15 @@ def export_csv(request):
             "container_family", "container_type", "container_status", "profile_notice",
             "profile_length_mm", "profile_width_mm", "profile_height_mm", "door_width_mm",
             "door_height_mm", "payload_limit_kg", "profile_source_url", "profile_source_checked",
-            "dimensions_source_kind", "dimensions_source_reference", *SHIPMENT_FIELDS.keys(),
+            "dimensions_source_kind", "dimensions_source_reference", "whole_load_cost_estimate", "cost_currency", "cost_status", *SHIPMENT_FIELDS.keys(),
         ]
         writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()
         profile = result["container"]
         export_profile = {
             "container_id": profile["id"], "container_name": profile["name"],
+            "whole_load_cost_estimate": result["pricing"]["amount"],
+            "cost_currency": result["pricing"]["currency"], "cost_status": result["pricing"]["status"],
             "profile_length_mm": profile["inside_mm"]["length"],
             "profile_width_mm": profile["inside_mm"]["width"],
             "profile_height_mm": profile["inside_mm"]["height"],
@@ -267,6 +279,7 @@ def export_json(request):
         shipment = _shipment_data(request.POST)
         custom_profile = _custom_profile_data(request.POST, container_id)
         result = _pack_source(request.POST.get("cargo_csv", ""), container_id, custom_profile)
+        result["pricing"] = estimate(result, shipment, quote_fields(request.POST))
         result["shipment"] = shipment
         response = HttpResponse(json.dumps(result, indent=2), content_type="application/json; charset=utf-8")
         response["Content-Disposition"] = 'attachment; filename="cargo-packing.json"'
@@ -319,4 +332,54 @@ def marine_forecast(request):
         else:
             response = JsonResponse(result)
     response["Cache-Control"] = "no-store"
+    return response
+
+
+@require_POST
+@never_cache
+def vessel_search(request):
+    from django.http import JsonResponse
+    from . import vessels
+    try:
+        payload = vessels.search(request.POST.get('query', ''))
+    except TrackingError as exc:
+        return JsonResponse({'error': {'code': exc.code, 'message': exc.message}}, status=exc.status)
+    return JsonResponse(payload)
+
+
+@require_POST
+@never_cache
+def vessel_detail(request):
+    from django.http import JsonResponse
+    from . import vessels
+    try:
+        payload = vessels.detail(request.POST.get('identifier', ''))
+    except TrackingError as exc:
+        return JsonResponse({'error': {'code': exc.code, 'message': exc.message}}, status=exc.status)
+    return JsonResponse(payload)
+
+
+@require_GET
+@never_cache
+def vesselfinder_embed(request):
+    """Opt-in, isolated official widget; never an AIS data extraction endpoint."""
+    if not getattr(settings, "VESSELFINDER_EMBED_ENABLED", False):
+        return HttpResponse("VesselFinder embed is disabled pending usage-scope review.", status=503)
+    kind = request.GET.get("kind", "")
+    identifier = request.GET.get("identifier", "")
+    if kind not in ("imo", "mmsi") or not re.fullmatch(r"[0-9]{7}" if kind == "imo" else r"[0-9]{9}", identifier):
+        return HttpResponse("Enter a seven-digit IMO or nine-digit MMSI.", status=400)
+    track = "true" if request.GET.get("track") == "1" else "false"
+    # Only the fixed enum and digits enter executable markup. Use documented widget,
+    # not undocumented iframe endpoints, scraping or a server-side provider call.
+    html = ('<!doctype html><html><head><meta charset="utf-8"><meta name="referrer" content="no-referrer">'
+            '<title>VesselFinder third-party map</title></head><body>'
+            '<p>Map by <a href="https://www.vesselfinder.com/" target="_blank" rel="noopener noreferrer">VesselFinder</a>. '
+            'Coverage and position freshness are controlled by VesselFinder. Not for navigation.</p>'
+            '<script>var width="100%",height="400",names=true;var ' + kind + '="' + identifier + '";var show_track=' + track + ';</script>'
+            '<script src="https://www.vesselfinder.com/aismap.js"></script></body></html>')
+    response = HttpResponse(html)
+    response["X-Frame-Options"] = "SAMEORIGIN"
+    response["Content-Security-Policy"] = "sandbox allow-scripts allow-popups"
+    response["Referrer-Policy"] = "no-referrer"
     return response
