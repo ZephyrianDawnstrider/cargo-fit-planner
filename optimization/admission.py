@@ -20,7 +20,7 @@ class ComputeRateLimitMiddleware:
     # Maximal percent-encoding can triple each decoded UTF-8 byte; 800 KiB
     # leaves room for a parser-valid 256 KiB CSV plus form fields/boundaries.
     MAX_REQUEST_BYTES = 800 * 1024
-    PATHS = {"/", "/export/csv/", "/export/json/", "/weather/"}
+    PATHS = {"/", "/export/csv/", "/export/json/", "/weather/", "/vessels/search/", "/vessels/detail/"}
 
     _lock = threading.Lock()
     _tokens = float(CAPACITY)

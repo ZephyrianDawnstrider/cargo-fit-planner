@@ -53,3 +53,6 @@ class OpenWatersTests(SimpleTestCase):
         # Real browser posts more than the legacy 16-field upload limit.
         response=self.client.post('/',{'cargo_csv':'','container_id':'20std',**{f'optional_{i}':'' for i in range(40)}})
         self.assertNotEqual(response.status_code,400)
+    def test_vessel_posts_share_production_admission_limits(self):
+        from .admission import ComputeRateLimitMiddleware
+        self.assertTrue({'/vessels/search/','/vessels/detail/'}.issubset(ComputeRateLimitMiddleware.PATHS))
