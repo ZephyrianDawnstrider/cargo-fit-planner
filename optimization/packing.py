@@ -9,7 +9,7 @@ whole millimetres and weights in 0.001 kg increments. It models
 rectangular cargo (including explicitly entered palletized and drum/roll
 bounding boxes), straight-through door clearance, container containment,
 non-overlap, payload, floor-only placement, and conservative single-item
-full-footprint support. Dangerous goods are held for manual compliance review.
+full-footprint support with positive user-declared top-load ratings and cumulative descendant-load checks. Ratings are not independently verified or strength certification. Unknown/zero ratings cannot support cargo. Dangerous goods are held for manual compliance review.
 It does not model load strength, lashing, axle/floor point loads, loading
 sequence/access after placement, or cargo-specific handling constraints.
 `palletized` dimensions and weight must include the entire palletized unit;
@@ -39,7 +39,7 @@ CSV_HEADERS = (
     "quantity", "stackable", "orientation",
 )
 OPTIONAL_CSV_HEADERS = (
-    "load_unit_type", "floor_only", "is_dg", "un_number", "imdg_class", "packing_group",
+    "load_unit_type", "floor_only", "is_dg", "un_number", "imdg_class", "packing_group", "max_supported_load_kg", "stacking_rating_source",
 )
 LOAD_UNIT_TYPES = {"carton_crate", "palletized", "drum_roll"}
 MAX_CSV_BYTES = 1_000_000
@@ -255,6 +255,15 @@ def parse_csv(text: str) -> list[dict[str, Any]]:
                         optional_flags[field] = _parse_flag(row[field])
                     except ValueError as exc:
                         add_error(row_number, field, str(exc))
+            top_load = None
+            if (row.get("max_supported_load_kg") or "").strip():
+                try:
+                    top_load = _top_load(row["max_supported_load_kg"])
+                except ValueError as exc:
+                    add_error(row_number, "max_supported_load_kg", str(exc))
+            rating_source = (row.get("stacking_rating_source") or "").strip()
+            if len(rating_source) > 200 or (top_load is not None and top_load > 0 and not rating_source):
+                add_error(row_number, "stacking_rating_source", "positive rating requires a source, at most 200 characters")
             dg_metadata = {}
             for field, limit in (("un_number", 16), ("imdg_class", 16), ("packing_group", 16)):
                 value = (row.get(field) or "").strip()
@@ -278,6 +287,8 @@ def parse_csv(text: str) -> list[dict[str, Any]]:
                     **dimensions,
                     "weight_kg": weight,
                     "stackable": stackable,
+                    "max_supported_load_kg": top_load,
+                    "stacking_rating_source": rating_source,
                     "orientation": orientation,
                     "load_unit_type": load_unit_type,
                     "floor_only": optional_flags["floor_only"],
@@ -292,6 +303,16 @@ def parse_csv(text: str) -> list[dict[str, Any]]:
     except csv.Error as exc:
         add_error(reader.line_num or None, "csv", f"invalid CSV syntax: {exc}")
         raise CsvValidationError(errors, truncated=truncated) from exc
+
+
+def _top_load(value):
+    """Declared uniformly supported gross load above a unit, not its own mass."""
+    if value is None or value == '':
+        return None
+    number = _finite_number(value, 'max_supported_load_kg')
+    if not 0 <= number <= 1_000_000 or number != round(number, 3):
+        raise ValueError('max_supported_load_kg must be 0..1000000 kg at 0.001 kg precision, or blank/unknown')
+    return number
 
 
 def _validate_items(items: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -338,7 +359,14 @@ def _validate_items(items: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
             raise ValueError(f"item {item_id}: orientation must be fixed or yaw")
         if orientation not in {"fixed", "yaw"}:
             raise ValueError(f"item {item_id}: orientation must be fixed or yaw")
-        data.update(weight_kg=weight, stackable=item["stackable"], orientation=orientation)
+        data.update(weight_kg=weight, stackable=item["stackable"], orientation=orientation,
+                    max_supported_load_kg=_top_load(item.get("max_supported_load_kg")))
+        rating_source = item.get('stacking_rating_source', '')
+        if not isinstance(rating_source, str) or len(rating_source.strip()) > 200:
+            raise ValueError('stacking_rating_source must be text up to 200 characters')
+        if (data['max_supported_load_kg'] or 0) > 0 and not rating_source.strip():
+            raise ValueError('positive max_supported_load_kg requires stacking_rating_source')
+        data['stacking_rating_source'] = rating_source.strip()
         load_unit_type = item.get("load_unit_type", "carton_crate")
         if not isinstance(load_unit_type, str) or load_unit_type not in LOAD_UNIT_TYPES:
             raise ValueError(f"item {item_id}: load_unit_type must be carton_crate, palletized, or drum_roll")
@@ -447,6 +475,54 @@ def _fits_door_and_container(item: dict[str, Any], container: dict[str, Any]) ->
     )
 
 
+def _stacking_violation(placed, *, loads_out=None):
+    """Shared bounded single-support tree check; returns (code, message, IDs) or None.
+
+    Every base carries the entire mass of every descendant (including siblings).
+    Missing/zero declared capacity forbids using a unit as support, even for a
+    zero-mass child. Ratings are user declarations, not engineering verification.
+    """
+    parents = {}
+    by_id = {p['item_id']: p for p in placed}
+    for cargo in placed:
+        if cargo['z'] == 0:
+            continue
+        supports = [base for base in placed
+                    if base['item_id'] != cargo['item_id'] and base['stackable']
+                    and base['z'] + base['dz'] == cargo['z']
+                    and base['x'] <= cargo['x'] and cargo['x'] + cargo['dx'] <= base['x'] + base['dx']
+                    and base['y'] <= cargo['y'] and cargo['y'] + cargo['dy'] <= base['y'] + base['dy']]
+        if len(supports) != 1:
+            return ('unsupported', 'Raised cargo needs one grounded full-footprint support chain.', [cargo['item_id']])
+        base = supports[0]
+        capacity = base.get('max_supported_load_kg')
+        if capacity is None or capacity <= 0:
+            return ('unknown_support_capacity', 'Supporting cargo requires a positive declared top-load rating.', [base['item_id'], cargo['item_id']])
+        parents[cargo['item_id']] = base['item_id']
+    loads = {ident: 0 for ident in by_id}
+    # Highest-first propagation adds own mass plus all descendants to its parent.
+    for cargo in sorted(placed, key=lambda p: (-p['z'], p['item_id'])):
+        ident = cargo['item_id']
+        if ident in parents:
+            parent = parents[ident]
+            loads[parent] += int(round(cargo['weight_kg'] * 1000)) + loads[ident]
+            capacity = int(round(by_id[parent]['max_supported_load_kg'] * 1000))
+            if loads[parent] > capacity:
+                return ('support_load_limit', 'Cumulative supported cargo exceeds the declared top-load rating.', [parent])
+    if loads_out is not None:
+        loads_out.update({ident: grams / 1000 for ident, grams in loads.items()})
+    return None
+
+
+def _annotate_supported_loads(placed):
+    loads = {}
+    violation = _stacking_violation(placed, loads_out=loads)
+    if violation:
+        raise ValueError(violation[1])
+    for cargo in placed:
+        cargo['supported_cargo_kg'] = loads[cargo['item_id']]
+
+
 def _candidate(item: dict[str, Any], placed: list[dict[str, Any]], budget: list[int],
                container: dict[str, Any]) -> tuple[dict[str, Any] | None, bool]:
     inner = container["inside_mm"]
@@ -459,7 +535,7 @@ def _candidate(item: dict[str, Any], placed: list[dict[str, Any]], budget: list[
             continue
         if dx > inner["length"] or dy > inner["width"] or dz > inner["height"]:
             continue
-        supports = [None] if item["floor_only"] else [None] + [p for p in placed if p["stackable"]]
+        supports = [None] if item["floor_only"] else [None] + [p for p in placed if p["stackable"] and (p.get("max_supported_load_kg") or 0) > 0]
         for support in supports:
             z = 0.0 if support is None else support["z"] + support["dz"]
             if z + dz > inner["height"]:
@@ -494,6 +570,8 @@ def _candidate(item: dict[str, Any], placed: list[dict[str, Any]], budget: list[
                         continue
                     position = {"x": x, "y": y, "z": z, "dx": dx, "dy": dy, "dz": dz}
                     if any(_overlap(position, p) for p in placed):
+                        continue
+                    if support is not None and _stacking_violation(placed + [{**item, **position}]):
                         continue
                     return {**position, "orientation": direction}, False
     return None, False
@@ -593,6 +671,7 @@ def pack_items(items: Iterable[dict[str, Any]], container_id: str = "20std", *,
             continue
         placed.append({**item, **position, "rotation_deg": 90 if position["orientation"] == "yaw" else 0})
         payload_grams += item_grams
+    _annotate_supported_loads(placed)
     total_volume = sum(p["dx"] * p["dy"] * p["dz"] for p in placed) / 1_000_000_000
     return {
         "container": {**container, "inside_mm": dict(container["inside_mm"]), "door_mm": dict(container["door_mm"])},
