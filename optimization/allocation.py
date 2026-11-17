@@ -133,6 +133,32 @@ def validate_allocation(result, config):
     return clone
 
 
+def _select_quota(items, customer, container):
+    """Measured gross quota selection, before geometric feasibility; no backfill."""
+    group = sorted((p for p in items if p['source_item_id'] in customer['source_item_ids']),
+                   key=lambda p: (-int(p['length_mm']) * int(p['width_mm']) * int(p['height_mm']), -p['weight_kg'], p['item_id']))
+    max_g, max_v = _caps(customer, container)
+    used_g = used_v = 0
+    eligible, unplaced = [], []
+    for p in group:
+        volume = int(p['length_mm']) * int(p['width_mm']) * int(p['height_mm'])
+        if p['is_dg']:
+            reason = 'manual_compliance_hold'
+        elif customer['bounds_mm']['z'][0] > 0:
+            reason = 'allocation_elevated_region_unsupported'
+        elif p['weight_kg'] > max_g / 1000 or used_g + int(round(p['weight_kg'] * 1000)) > max_g:
+            reason = 'customer_weight_quota'
+        elif used_v + volume > max_v:
+            reason = 'customer_volume_quota'
+        else:
+            eligible.append(p)
+            used_g += int(round(p['weight_kg'] * 1000))
+            used_v += volume
+            continue
+        unplaced.append({**p, 'reason': reason})
+    return eligible, unplaced
+
+
 def pack_allocated(items, container_id='20std', custom_profile=None, config=None):
     """Deterministic quota-filtered packing; original dimensions/masses unchanged.
 
@@ -152,27 +178,8 @@ def pack_allocated(items, container_id='20std', custom_profile=None, config=None
     customers = _config(config, normalized, container)
     placed, unplaced, shared = [], [], []
     for customer in customers:
-        group = sorted((p for p in normalized if p['source_item_id'] in customer['source_item_ids']),
-                       key=lambda p: (-int(p['length_mm']) * int(p['width_mm']) * int(p['height_mm']), -p['weight_kg'], p['item_id']))
-        max_g, max_v = _caps(customer, container)
-        used_g = used_v = 0
-        eligible = []
-        for p in group:
-            volume = int(p['length_mm']) * int(p['width_mm']) * int(p['height_mm'])
-            if p['is_dg']:
-                reason = 'manual_compliance_hold'
-            elif customer['bounds_mm']['z'][0] > 0:
-                reason = 'allocation_elevated_region_unsupported'
-            elif p['weight_kg'] > max_g / 1000 or used_g + int(round(p['weight_kg'] * 1000)) > max_g:
-                reason = 'customer_weight_quota'
-            elif used_v + volume > max_v:
-                reason = 'customer_volume_quota'
-            else:
-                eligible.append(p)
-                used_g += int(round(p['weight_kg'] * 1000))
-                used_v += volume
-                continue
-            unplaced.append({**p, 'reason': reason})
+        eligible, held = _select_quota(normalized, customer, container)
+        unplaced.extend(held)
         if not eligible:
             continue
         if customer['region'] is None:
