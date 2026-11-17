@@ -49,7 +49,7 @@ _cooldown_until = 0
 _logger = logging.getLogger(__name__)
 
 
-def _diagnostic(exc, stage, *, status=None, content_type='unknown', encoding='unknown', size=None):
+def _diagnostic(exc, stage, *, status=None, content_type='unknown', encoding='unknown', size=None, api_code='none'):
     """Allowlisted operational categories only: no exception text, URLs or cargo/query data."""
     allowed = {'HTTPError', 'URLError', 'gaierror', 'TimeoutError', 'ConnectionRefusedError',
                'ConnectionResetError', 'SSLError', 'SSLCertVerificationError', 'OSError',
@@ -57,10 +57,11 @@ def _diagnostic(exc, stage, *, status=None, content_type='unknown', encoding='un
                'ValueError', 'TypeError', 'RecursionError', 'OverflowError', 'AttributeError', 'KeyError'}
     kind = type(exc).__name__
     reason = type(exc.reason).__name__ if isinstance(exc, URLError) else 'none'
-    _logger.warning('Vessel directory failure stage=%s exception=%s reason_type=%s status=%s content_type=%s encoding=%s bytes=%s',
+    _logger.warning('Vessel directory failure stage=%s exception=%s reason_type=%s status=%s content_type=%s encoding=%s bytes=%s api_code=%s',
                     stage, kind if kind in allowed else 'other', reason if reason in allowed else ('none' if reason == 'none' else 'other'),
                     status if type(status) is int else None, content_type, encoding,
-                    size if type(size) is int else None)
+                    size if type(size) is int else None,
+                    api_code if api_code in {'none', 'maxlag', 'ratelimited', 'badvalue', 'readonly', 'permissiondenied', 'badtoken', 'assertuserfailed', 'unknown_action', 'other'} else 'other')
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -80,6 +81,7 @@ def _request_json(params):
                       headers={'User-Agent': 'CargoFitPlanner/1.0 (https://github.com/ZephyrianDawnstrider/cargo-fit-planner)',
                                'Accept': 'application/json', 'Accept-Encoding': 'gzip'})
     stage, status, content_type, encoding, size = 'connect', None, 'unknown', 'unknown', None
+    api_code = 'none'
     try:
         with build_opener(ProxyHandler({}), _NoRedirect()).open(request, timeout=TIMEOUT_SECONDS) as response:
             stage = 'read'
@@ -102,18 +104,25 @@ def _request_json(params):
             stage = 'json'
             data = json.loads(raw)
             stage = 'api'
+            if isinstance(data, dict) and isinstance(data.get('error'), dict):
+                code = data['error'].get('code')
+                allowed_codes = {'maxlag', 'ratelimited', 'badvalue', 'readonly', 'permissiondenied',
+                                 'badtoken', 'assertuserfailed', 'unknown_action'}
+                api_code = code if isinstance(code, str) and code in allowed_codes else 'other'
+                if api_code in {'maxlag', 'ratelimited', 'readonly'}:
+                    _cooldown_until = max(_cooldown_until, time.monotonic() + 300)
             if not isinstance(data, dict) or data.get('error') or data.get('success') == 0:
                 raise ValueError('invalid API response')
             return data
     except HTTPError as exc:
-        _diagnostic(exc, stage, status=exc.code, content_type=content_type, encoding=encoding, size=size)
+        _diagnostic(exc, stage, status=exc.code, content_type=content_type, encoding=encoding, size=size, api_code=api_code)
         if exc.code in (429, 503):
             retry = exc.headers.get('Retry-After', '') if exc.headers else ''
             delay = min(3600, max(60, int(retry))) if retry.isascii() and retry.isdigit() and len(retry) < 8 else 300
             _cooldown_until = time.monotonic() + delay
         raise TrackingError('directory_unavailable', 'The vessel name directory is temporarily unavailable. Try later.') from None
     except (URLError, OSError, EOFError, zlib.error, ValueError, TypeError, RecursionError, OverflowError) as exc:
-        _diagnostic(exc, stage, status=status, content_type=content_type, encoding=encoding, size=size)
+        _diagnostic(exc, stage, status=status, content_type=content_type, encoding=encoding, size=size, api_code=api_code)
         _cooldown_until = max(_cooldown_until, time.monotonic() + 60)
         raise TrackingError('directory_unavailable', 'The vessel name directory could not return valid results. Try later.') from None
 

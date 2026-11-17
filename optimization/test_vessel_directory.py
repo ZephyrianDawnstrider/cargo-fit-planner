@@ -123,6 +123,19 @@ class DirectoryTests(SimpleTestCase):
             self.assertEqual(ctx.exception.code,'directory_busy')
         finally:directory._lock.release()
 
+    def test_api_error_code_allowlisted_and_maxlag_cooldown(self):
+        for code, expected in (('maxlag','maxlag'),('ratelimited','ratelimited'),('private-code','other')):
+            directory._cooldown_until=0
+            response=Mock();response.status=200;response.headers={'Content-Type':'application/json'}
+            response.read.return_value=json.dumps({'error':{'code':code,'info':'private query diagnostic'}}).encode()
+            opener=Mock();opener.open.return_value.__enter__=Mock(return_value=response);opener.open.return_value.__exit__=Mock(return_value=False)
+            before=directory.time.monotonic()
+            with patch.object(directory,'build_opener',return_value=opener),self.assertLogs(directory.__name__,level='WARNING') as logs:
+                with self.assertRaises(TrackingError):directory._request_json({})
+            text=' '.join(logs.output)
+            self.assertIn('api_code='+expected,text);self.assertNotIn('private',text)
+            if code in ('maxlag','ratelimited'):self.assertGreaterEqual(directory._cooldown_until,before+300)
+
     def test_dns_diagnostics_class_only_no_exception_text(self):
         import socket
         opener=Mock();opener.open.side_effect=URLError(socket.gaierror(-3,'private query and hostname'))
