@@ -7,7 +7,7 @@ from copy import deepcopy
 
 from .allocation import pack_allocated, validate_allocation, _config as _allocation_config, _select_quota
 from .manual_layout import validate_manual_layout, ManualLayoutError
-from .packing import _validate_items, _resolve_container, _custom_container, _mass_distribution, pack_items
+from .packing import _validate_items, _resolve_container, _custom_container, _mass_distribution, pack_items, _hold_summary
 
 _FIELDS = ('dimension_tolerance_mm', 'horizontal_gap_mm', 'wall_clearance_mm',
            'roof_clearance_mm', 'door_clearance_mm')
@@ -187,11 +187,11 @@ def _pack_combined(source, container, allocation, config):
         result = pack_items(shared, 'custom_dry', custom_profile=global_profile)
         placed.extend(result['placed'])
         unplaced.extend(result['unplaced'])
-    holds = sum(p['reason']=='manual_compliance_hold' for p in unplaced)
+    hold_summary = _hold_summary(unplaced)
     engine = {'container': container, 'placed': placed, 'unplaced': unplaced,
-              'readiness': 'manual_compliance_hold' if holds else 'packing_preview_only',
+              'readiness': hold_summary['readiness'],
               'totals': {'input_count': len(source), 'placed_count': len(placed), 'unplaced_count': len(unplaced),
-                         'manual_compliance_hold_count': holds,
+                         **{k:v for k,v in hold_summary.items() if k != 'readiness'},
                          'placed_weight_kg': sum(int(round(p['weight_kg']*1000)) for p in placed)/1000}}
     return _validate_combined(_restore(engine, source, container, config), allocation, config)
 

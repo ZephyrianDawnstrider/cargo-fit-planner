@@ -8,7 +8,7 @@ from copy import deepcopy
 from decimal import Decimal, InvalidOperation
 
 from .packing import (_validate_items, _resolve_container, _custom_container,
-                      _mass_distribution, pack_items)
+                      _mass_distribution, pack_items, _hold_summary)
 
 _AXES = {'x': 'length', 'y': 'width', 'z': 'height'}
 NOTICE = ('Customer caps reserve shares of whole-equipment payload and internal volume; '
@@ -144,6 +144,8 @@ def _select_quota(items, customer, container):
         volume = int(p['length_mm']) * int(p['width_mm']) * int(p['height_mm'])
         if p['is_dg']:
             reason = 'manual_compliance_hold'
+        elif p.get('requires_temperature_control', False):
+            reason = 'temperature_control_manual_hold'
         elif customer['bounds_mm']['z'][0] > 0:
             reason = 'allocation_elevated_region_unsupported'
         elif p['weight_kg'] > max_g / 1000 or used_g + int(round(p['weight_kg'] * 1000)) > max_g:
@@ -199,12 +201,12 @@ def pack_allocated(items, container_id='20std', custom_profile=None, config=None
         result = pack_items(shared, container_id, custom_profile=custom_profile)
         placed.extend(result['placed'])
         unplaced.extend(result['unplaced'])
-    holds = sum(p['reason'] == 'manual_compliance_hold' for p in unplaced)
+    holds = _hold_summary(unplaced)
     result = {'container': deepcopy(container), 'placed': placed, 'unplaced': unplaced,
               'mass_distribution': _mass_distribution(placed, container),
-              'readiness': 'manual_compliance_hold' if holds else 'packing_preview_only',
+              'readiness': holds['readiness'],
               'totals': {'input_count': len(normalized), 'placed_count': len(placed), 'unplaced_count': len(unplaced),
-                         'manual_compliance_hold_count': holds,
+                         **{k: v for k, v in holds.items() if k != 'readiness'},
                          'placed_weight_kg': sum(int(round(p['weight_kg'] * 1000)) for p in placed) / 1000,
                          'placed_volume_m3': sum(p['dx'] * p['dy'] * p['dz'] for p in placed) / 1e9}}
     return validate_allocation(result, config)

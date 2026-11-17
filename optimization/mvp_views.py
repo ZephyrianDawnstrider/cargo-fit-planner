@@ -99,6 +99,13 @@ def _allowances_data(data):
 def _with_unverified_floor_checks(result):
     # Explicitly unknown regardless of geometric fit or total payload. Neither
     # check is implemented; no generic equipment/load threshold is inferred.
+    result["special_handling_review"] = {
+        "status": "intake_only_unverified",
+        "notice": "Temperature-controlled units are held, not placed in dry-box geometry. "
+                  "Stated temperature ranges, handling sources and DG declaration references are unverified intake data. "
+                  "Blank values remain unknown. No reefer suitability, airflow, humidity, DG classification, "
+                  "segregation, carrier acceptance or transport approval is performed.",
+    }
     result["unverified_checks"] = {
         "floor_concentrated_load": "UNVERIFIED",
         "forklift_axle_load": "UNVERIFIED",
@@ -274,12 +281,13 @@ def export_csv(request):
         output = io.StringIO(newline="")
         fields = [
             "item_id", "source_item_id", "customer_id", "name", "status", "reason",
-            "floor_concentrated_load_check", "forklift_axle_load_check", "unverified_checks_notice",
+            "floor_concentrated_load_check", "forklift_axle_load_check", "unverified_checks_notice", "special_handling_review_notice",
             "x", "y", "z", "dx", "dy", "dz",
             "planning_envelope_dx_mm", "planning_envelope_dy_mm", "planning_envelope_dz_mm", "planning_allowances_json", "customer_allocation_json",
             "length_mm", "width_mm", "height_mm", "weight_kg", "stackable",
             "orientation", "rotation_deg", "load_unit_type", "floor_only", "is_dg",
             "max_supported_load_kg", "stacking_rating_source", "supported_cargo_kg",
+            "requires_temperature_control", "temperature_min_c", "temperature_max_c", "handling_source", "dg_declaration_reference",
             "un_number", "imdg_class", "packing_group", "readiness", "container_id", "container_name",
             "container_family", "container_type", "container_status", "profile_notice",
             "profile_length_mm", "profile_width_mm", "profile_height_mm", "door_width_mm",
@@ -294,6 +302,7 @@ def export_csv(request):
             "floor_concentrated_load_check": result["unverified_checks"]["floor_concentrated_load"],
             "forklift_axle_load_check": result["unverified_checks"]["forklift_axle_load"],
             "unverified_checks_notice": result["unverified_checks"]["notice"],
+            "special_handling_review_notice": result["special_handling_review"]["notice"],
             "planning_allowances_json": json.dumps(result.get("allowances", {}), ensure_ascii=False),
             "customer_allocation_json": json.dumps(result.get("allocation", {}), ensure_ascii=False),
             "whole_load_cost_estimate": result["pricing"]["amount"],
