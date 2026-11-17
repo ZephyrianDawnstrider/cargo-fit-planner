@@ -96,13 +96,27 @@ def _allowances_data(data):
         raise ValueError("Planning allowance settings are invalid.") from None
 
 
+def _with_unverified_floor_checks(result):
+    # Explicitly unknown regardless of geometric fit or total payload. Neither
+    # check is implemented; no generic equipment/load threshold is inferred.
+    result["unverified_checks"] = {
+        "floor_concentrated_load": "UNVERIFIED",
+        "forklift_axle_load": "UNVERIFIED",
+        "notice": "Floor concentrated/point loads and forklift axle loads are UNVERIFIED. "
+                  "Passing total payload, geometry or stacking checks does not verify them. "
+                  "Equipment-specific floor limits, cargo contact/load distribution and "
+                  "forklift/handling axle data require separate qualified assessment.",
+    }
+    return result
+
+
 def _pack_source(source, container_id="20std", custom_profile=None, allocation=None, allowances=None):
     if _source_too_large(source):
         raise ValueError("CSV is too large. Keep uploads under 256 KiB.")
     if container_id not in CONTAINERS and container_id != "custom_dry":
         raise ValueError("Select one of the listed container profile examples.")
     from .allowances import pack_with_allowances
-    return pack_with_allowances(parse_csv(source), container_id=container_id, custom_profile=custom_profile, allocation=allocation, allowances=allowances)
+    return _with_unverified_floor_checks(pack_with_allowances(parse_csv(source), container_id=container_id, custom_profile=custom_profile, allocation=allocation, allowances=allowances))
 
 
 def _shipment_data(data):
@@ -260,6 +274,7 @@ def export_csv(request):
         output = io.StringIO(newline="")
         fields = [
             "item_id", "source_item_id", "customer_id", "name", "status", "reason",
+            "floor_concentrated_load_check", "forklift_axle_load_check", "unverified_checks_notice",
             "x", "y", "z", "dx", "dy", "dz",
             "planning_envelope_dx_mm", "planning_envelope_dy_mm", "planning_envelope_dz_mm", "planning_allowances_json", "customer_allocation_json",
             "length_mm", "width_mm", "height_mm", "weight_kg", "stackable",
@@ -276,6 +291,9 @@ def export_csv(request):
         profile = result["container"]
         export_profile = {
             "container_id": profile["id"], "container_name": profile["name"],
+            "floor_concentrated_load_check": result["unverified_checks"]["floor_concentrated_load"],
+            "forklift_axle_load_check": result["unverified_checks"]["forklift_axle_load"],
+            "unverified_checks_notice": result["unverified_checks"]["notice"],
             "planning_allowances_json": json.dumps(result.get("allowances", {}), ensure_ascii=False),
             "customer_allocation_json": json.dumps(result.get("allocation", {}), ensure_ascii=False),
             "whole_load_cost_estimate": result["pricing"]["amount"],
@@ -439,8 +457,8 @@ def _apply_manual_snapshot(result, data):
     except RecursionError:
         raise ValueError("Manual layout nesting is invalid.") from None
     from .allowances import validate_with_allowances
-    return validate_with_allowances(result, placements, source_items=parse_csv(data.get("cargo_csv", "")),
-                                    allowances=_allowances_data(data), allocation=_allocation_data(data))
+    return _with_unverified_floor_checks(validate_with_allowances(result, placements, source_items=parse_csv(data.get("cargo_csv", "")),
+                                    allowances=_allowances_data(data), allocation=_allocation_data(data)))
 
 
 
