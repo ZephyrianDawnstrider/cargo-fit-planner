@@ -55,7 +55,8 @@ class AllowanceTests(unittest.TestCase):
     def test_wall_infringement(self):
         source=[item('a')];cfg=settings();result=pack_with_allowances(source,allowances=cfg)
         moved=edits(result);moved[0]['x']=29
-        with self.assertRaises(ValueError):validate_with_allowances(result,moved,source,cfg)
+        with self.assertRaisesRegex(ValueError, "at least 30 mm from the side/end walls"):
+            validate_with_allowances(result,moved,source,cfg)
 
     def test_all_positive_modes_disallow_stacking(self):
         for field in ('dimension_tolerance_mm','horizontal_gap_mm','wall_clearance_mm','roof_clearance_mm','door_clearance_mm'):

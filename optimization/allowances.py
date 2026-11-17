@@ -149,6 +149,8 @@ def validate_with_allowances(result, placements, source_items, allowances=None, 
     for edit in edits:
         if edit['z'] != 0:
             raise ManualLayoutError('floor_only', 'Positive allowances require floor-only placements', [edit['item_id']])
+        if edit['x'] < config['wall_clearance_mm'] or edit['y'] < config['wall_clearance_mm']:
+            raise ManualLayoutError('wall_clearance', f"Keep cargo at least {config['wall_clearance_mm']} mm from the side/end walls.", [edit['item_id']])
         edit['x'] -= config['wall_clearance_mm']
         edit['y'] -= config['wall_clearance_mm']
     checked = validate_manual_layout(engine, edits, source_items=transformed)
