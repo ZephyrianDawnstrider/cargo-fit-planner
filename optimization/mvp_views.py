@@ -220,6 +220,7 @@ def export_csv(request):
         shipment = _shipment_data(request.POST)
         custom_profile = _custom_profile_data(request.POST, container_id)
         result = _pack_source(request.POST.get("cargo_csv", ""), container_id, custom_profile)
+        result = _apply_manual_snapshot(result, request.POST)
         result["pricing"] = estimate(result, shipment, quote_fields(request.POST))
         output = io.StringIO(newline="")
         fields = [
@@ -279,6 +280,7 @@ def export_json(request):
         shipment = _shipment_data(request.POST)
         custom_profile = _custom_profile_data(request.POST, container_id)
         result = _pack_source(request.POST.get("cargo_csv", ""), container_id, custom_profile)
+        result = _apply_manual_snapshot(result, request.POST)
         result["pricing"] = estimate(result, shipment, quote_fields(request.POST))
         result["shipment"] = shipment
         response = HttpResponse(json.dumps(result, indent=2), content_type="application/json; charset=utf-8")
@@ -383,3 +385,38 @@ def vesselfinder_embed(request):
     response["Content-Security-Policy"] = "sandbox allow-scripts allow-popups"
     response["Referrer-Policy"] = "no-referrer"
     return response
+
+
+def _apply_manual_snapshot(result, data):
+    raw = data.get("manual_layout_json", "")
+    if not raw:
+        return result
+    if len(raw) > 32000:
+        raise ValueError("Manual layout snapshot is too large.")
+    from .manual_layout import validate_manual_layout
+    try:
+        placements = json.loads(raw)
+    except RecursionError:
+        raise ValueError("Manual layout nesting is invalid.") from None
+    return validate_manual_layout(result, placements, source_items=parse_csv(data.get("cargo_csv", "")))
+
+
+@require_POST
+@never_cache
+def validate_layout(request):
+    from django.http import JsonResponse
+    if not _COMPUTE_SLOT.acquire(blocking=False):
+        return _busy_response()
+    try:
+        container_id = request.POST.get("container_id", "20std").strip()
+        custom = _custom_profile_data(request.POST, container_id)
+        result = _pack_source(request.POST.get("cargo_csv", ""), container_id, custom)
+        if not request.POST.get("manual_layout_json"):
+            raise ValueError("Provide a complete manual layout snapshot.")
+        result = _apply_manual_snapshot(result, request.POST)
+        result["pricing"] = estimate(result, _shipment_data(request.POST), quote_fields(request.POST))
+        return JsonResponse(result)
+    except (ValueError, TypeError, UnicodeError) as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    finally:
+        _COMPUTE_SLOT.release()

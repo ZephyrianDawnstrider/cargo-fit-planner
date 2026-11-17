@@ -209,7 +209,7 @@ class CargoMvpViewTests(SimpleTestCase):
         )
         self.assertContains(response, "BOX-001")
         self.assertContains(response, "3D placement preview")
-        self.assertContains(response, "Change view angle")
+        self.assertContains(response, "Reset camera")
         self.assertContains(response, "source rows")
         self.assertContains(response, "expanded input")
         self.assertContains(response, "Capacity, weight and container details")

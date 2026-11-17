@@ -20,11 +20,13 @@ ALLOWLIST = (
     "optimization/admission.py",
     "optimization/mvp_views.py",
     "optimization/packing.py",
+    "optimization/manual_layout.py",
     "optimization/pricing.py",
     "optimization/vessels.py",
     "optimization/openwaters.py",
     "optimization/tracking.py",
     "optimization/templates/optimization/mvp.html",
+    "optimization/templates/optimization/scene.js",
 )
 
 
