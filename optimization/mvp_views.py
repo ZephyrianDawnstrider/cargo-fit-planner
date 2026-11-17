@@ -264,6 +264,7 @@ def export_csv(request):
             "planning_envelope_dx_mm", "planning_envelope_dy_mm", "planning_envelope_dz_mm", "planning_allowances_json",
             "length_mm", "width_mm", "height_mm", "weight_kg", "stackable",
             "orientation", "rotation_deg", "load_unit_type", "floor_only", "is_dg",
+            "max_supported_load_kg", "stacking_rating_source", "supported_cargo_kg",
             "un_number", "imdg_class", "packing_group", "readiness", "container_id", "container_name",
             "container_family", "container_type", "container_status", "profile_notice",
             "profile_length_mm", "profile_width_mm", "profile_height_mm", "door_width_mm",

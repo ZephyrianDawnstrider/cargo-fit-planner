@@ -13,7 +13,7 @@ from copy import deepcopy
 import math
 from typing import Any
 
-from .packing import MAX_ITEMS, _mass_distribution, _overlap, _validate_items
+from .packing import MAX_ITEMS, _mass_distribution, _overlap, _validate_items, _stacking_violation, _annotate_supported_loads
 
 
 class ManualLayoutError(ValueError):
@@ -138,14 +138,11 @@ def validate_manual_layout(packing_result: dict[str, Any], placements: list[dict
             if _overlap(cargo, other):
                 _reject('overlap', 'Cargo units overlap. Touching faces are allowed, intersections are not.',
                         cargo['item_id'], other['item_id'])
-        if cargo['z'] > 0 and not any(
-            base['item_id'] != cargo['item_id'] and base['stackable']
-            and base['z'] + base['dz'] == cargo['z']
-            and base['x'] <= cargo['x'] and cargo['x'] + cargo['dx'] <= base['x'] + base['dx']
-            and base['y'] <= cargo['y'] and cargo['y'] + cargo['dy'] <= base['y'] + base['dy']
-            for base in moved
-        ):
-            _reject('unsupported', 'Raised cargo needs one stackable unit supporting its entire footprint.', cargo['item_id'])
+    violation = _stacking_violation(moved)
+    if violation:
+        code, message, ids = violation
+        _reject(code, message, *ids)
+    _annotate_supported_loads(moved)
     volume_mm3 = sum(int(p['dx']) * int(p['dy']) * int(p['dz']) for p in moved)
     if volume_mm3 > inner['length'] * inner['width'] * inner['height']:
         _reject('volume_limit', 'Placed cargo volume exceeds the container volume.')

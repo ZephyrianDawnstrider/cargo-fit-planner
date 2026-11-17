@@ -62,7 +62,7 @@ class PackingTests(unittest.TestCase):
         self.assertEqual(result["unplaced"][0]["item_id"], "top")
 
     def test_stackable_full_footprint_support_is_allowed(self):
-        items = [item("base", length=5800, width=2300, height=500),
+        items = [{**item("base", length=5800, width=2300, height=500), "max_supported_load_kg": 100, "stacking_rating_source": "Test rating"},
                  item("top", length=5000, width=2000, height=300)]
         result = pack_items(items)
         by_id = {x["item_id"]: x for x in result["placed"]}
@@ -277,7 +277,7 @@ class PackingTests(unittest.TestCase):
         self.assertEqual(by_id["b-floor-only"]["z"], 0)
 
         floor_support = pack_items([
-            {**item("a-floor-base", length=5896, width=2350, height=300, stackable=True), "floor_only": True},
+            {**item("a-floor-base", length=5896, width=2350, height=300, stackable=True), "floor_only": True, "max_supported_load_kg": 100, "stacking_rating_source": "Test rating"},
             item("b-top", length=500, width=500, height=100),
         ])
         by_id = {cargo["item_id"]: cargo for cargo in floor_support["placed"]}
@@ -430,7 +430,7 @@ class MassDistributionTests(unittest.TestCase):
 
     def test_stacking_height_and_half_millimeter_centers(self):
         # Full-footprint base leaves no second floor location; the second unit stacks.
-        result = pack_items([item('base', length=5801, width=2301, height=501, weight=30),
+        result = pack_items([{**item('base', length=5801, width=2301, height=501, weight=30), 'max_supported_load_kg': 100, 'stacking_rating_source': 'Test rating'},
                              item('top', length=5801, width=2301, height=499, weight=10)])
         self.assertEqual(len(result['placed']), 2)
         self.assertEqual(result['mass_distribution']['center_mm'],

@@ -125,7 +125,7 @@ class ManualLayoutTests(unittest.TestCase):
         self.assert_rejected('unsupported', result, changes)
 
     def test_full_support_is_order_independent_and_base_must_be_grounded(self):
-        result = pack_items([item('base', length=1000, width=1000, height=400), item('top')])
+        result = pack_items([item('base', length=1000, width=1000, height=400, max_supported_load_kg=100, stacking_rating_source='Test rating'), item('top')])
         changes = edits(result)
         next(p for p in changes if p['item_id'] == 'top').update(x=0, y=0, z=400)
         changed = validate_manual_layout(result, list(reversed(changes)))
@@ -156,7 +156,7 @@ class ManualLayoutTests(unittest.TestCase):
         self.assert_rejected('floor_only', result, changes, source_items=source)
 
     def test_relocated_support_must_still_cover_top(self):
-        result = pack_items([item('base', length=5800, width=2300, height=500),
+        result = pack_items([item('base', length=5800, width=2300, height=500, max_supported_load_kg=100, stacking_rating_source='Test rating'),
                              item('top', length=5000, width=2000, height=300)])
         changes = edits(result)
         next(p for p in changes if p['item_id'] == 'base')['x'] = 96

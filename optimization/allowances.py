@@ -91,6 +91,7 @@ def _restore(engine, source, container, config):
             p.update(x=p['x']+wall, y=p['y']+wall, dx=dx, dy=dy, dz=original['height_mm'])
             p['planning_envelope_mm'] = {'dx': dx+t, 'dy': dy+t, 'dz': original['height_mm']+t}
             p['planning_floor_only'] = True
+            p['supported_cargo_kg'] = 0.0
     result['container'] = deepcopy(container)
     result['totals']['placed_volume_m3'] = sum(p['dx']*p['dy']*p['dz'] for p in result['placed'])/1e9
     result['totals']['placed_envelope_volume_m3'] = sum(

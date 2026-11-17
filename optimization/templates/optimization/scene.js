@@ -11,7 +11,7 @@ const el=(tag,attrs={},text=null)=>{const n=document.createElementNS(ns,tag);for
 function selection(){
  const p=packed.placed.find(p=>p.item_id===selected);controls.disabled=busy||!p;
  if(p){byId('manual-x').value=p.x;byId('manual-y').value=p.y;byId('manual-z').value=p.z;byId('manual-rotation').value=p.rotation_deg||0;}
- byId('selection-feedback').textContent=p?`${p.item_id} · ${p.name} · ${p.dx} × ${p.dy} × ${p.dz} mm · ${p.weight_kg} kg${p.planning_envelope_mm?' · dashed outline = tolerance envelope':''}`:'No box selected. Click a box or its coordinate-table label.';
+ byId('selection-feedback').textContent=p?`${p.item_id} · ${p.name} · ${p.dx} × ${p.dy} × ${p.dz} mm · ${p.weight_kg} kg · mass above ${p.supported_cargo_kg??0} kg / rated ${p.max_supported_load_kg??'unknown'} kg${p.planning_envelope_mm?' · dashed outline = tolerance envelope':''}`:'No box selected. Click a box or its coordinate-table label.';
  document.querySelectorAll('.cargo-row[data-item-id]').forEach(n=>n.classList.toggle('is-highlighted',n.dataset.itemId===selected));
  document.querySelectorAll('.item-link[data-item-id]').forEach(n=>n.setAttribute('aria-pressed',String(n.dataset.itemId===selected)));
 }
@@ -49,6 +49,7 @@ function setBusy(value){busy=value;controls.disabled=value||!selected;document.q
 function reflect(){
  document.querySelectorAll('input[name="manual_layout_json"]').forEach(n=>n.value=JSON.stringify(layout(packed)));
  for(const row of document.querySelectorAll('.cargo-row[data-item-id]')){const p=packed.placed.find(p=>p.item_id===row.dataset.itemId);if(p){row.cells[2].textContent=`${p.x}, ${p.y}, ${p.z}`;row.cells[3].textContent=`${p.dx}, ${p.dy}, ${p.dz}`;}}
+ document.querySelectorAll('.supported-load[data-item-id]').forEach(n=>{const p=packed.placed.find(p=>p.item_id===n.dataset.itemId);if(p)n.textContent=p.supported_cargo_kg??0;});
  const center=packed.mass_distribution?.center_mm;byId('mass-center-summary').textContent=center?`Estimated cargo centre from packing origin: X ${center.x.toFixed(1)} mm · Y ${center.y.toFixed(1)} mm · Z ${center.z.toFixed(1)} mm.`:'Centre is unknown: no positive placed cargo mass.';
  selection();draw();
 }
