@@ -25,6 +25,7 @@ ALLOWLIST = (
     "optimization/allowances.py",
     "optimization/pricing.py",
     "optimization/vessels.py",
+    "optimization/vessel_directory.py",
     "optimization/openwaters.py",
     "optimization/tracking.py",
     "optimization/templates/optimization/mvp.html",

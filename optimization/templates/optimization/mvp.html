@@ -169,6 +169,12 @@
         <iframe id="vf-frame" title="VesselFinder third-party vessel map" sandbox="allow-scripts allow-popups" referrerpolicy="no-referrer" style="width:100%;height:470px;border:0" hidden></iframe>
         {% else %}<p>Disabled on this deployment pending permission/usage-scope review. No VesselFinder scripts or maps are loaded.</p>{% endif %}
       </section>
+      <section aria-label="Ship name directory"><h3>Find an IMO number by ship name</h3>
+        <p>Search Wikidata’s incomplete, community-maintained ship directory, then choose an identity. Names may be former names, aliases or shared by several ships. Confirm the IMO with your logistics provider. This is not AIS, a complete vessel registry or a position search.</p>
+        <form id="ship-directory-form" method="post" action="{% url 'vessel-name-directory' %}">{% csrf_token %}<label>Ship name for directory lookup <input name="query" minlength="2" maxlength="120" required autocomplete="off"></label><button>Search ship names</button></form>
+        <p class="subtle">Only a submitted ship name is sent to Wikidata through this app, not cargo or shipment fields. <a href="https://www.wikidata.org/wiki/Wikidata:Data_access" target="_blank" rel="noopener noreferrer">Wikidata structured data: CC0</a>. Directory records can be outdated or wrong; no result does not mean the ship does not exist.</p>
+        <p id="ship-directory-status" role="status" aria-live="polite"></p><ul id="ship-directory-results"></ul>
+      </section>
       <section aria-label="External vessel map"><h3>Open a ship map on VesselFinder</h3>
         <p>Use the ship’s IMO number supplied by your logistics provider. This opens VesselFinder in a new tab, outside this app. Check the vessel identity and report time there; a valid number does not guarantee a matching vessel or current position.</p>
         <form id="external-vessel-form"><label>IMO number for external map <input id="external-vessel-imo" inputmode="numeric" maxlength="20" autocomplete="off"></label><button type="submit">Prepare VesselFinder link</button></form>
@@ -262,6 +268,30 @@
     }
     externalLink.href='https://www.vesselfinder.com/?imo='+encodeURIComponent(imo);externalLink.hidden=false;
     externalStatus.textContent='Link prepared for IMO '+imo+'. Vessel identity and position availability have not been checked by this app.';
+  });
+  // Ship directory is identity-only; no position is fetched or inferred.
+  const directoryForm=document.getElementById('ship-directory-form'),directoryStatus=document.getElementById('ship-directory-status'),directoryResults=document.getElementById('ship-directory-results');
+  let directorySequence=0,directoryAbort=null,directorySelected=false;
+  externalImo.addEventListener('input',()=>{directorySelected=false;});
+  function resetDirectory(){directorySequence++;if(directoryAbort)directoryAbort.abort();directoryResults.replaceChildren();directoryStatus.textContent='';if(directorySelected){externalImo.value='';clearExternalVesselLink();directorySelected=false;}}
+  directoryForm.addEventListener('input',resetDirectory);
+  directoryForm.addEventListener('submit',async event=>{
+    event.preventDefault();resetDirectory();const sequence=directorySequence;directoryAbort=new AbortController();directoryStatus.textContent='Searching ship identities, not live positions…';
+    try{
+      const response=await fetch(directoryForm.action,{method:'POST',body:new FormData(directoryForm),credentials:'same-origin',signal:directoryAbort.signal});
+      let payload;try{payload=await response.json();}catch(_){throw new Error(response.status===403?'Security check failed. Refresh and retry.':'Directory response could not be read.');}
+      if(sequence!==directorySequence)return;if(!response.ok)throw new Error(payload.error?.message||'Ship directory unavailable.');
+      for(const item of payload.results){
+        if(!/^Q[1-9][0-9]*$/.test(item.id)||! /^[0-9]{7}$/.test(item.imo)||[...item.imo.slice(0,6)].reduce((sum,digit,index)=>sum+Number(digit)*(7-index),0)%10!==Number(item.imo[6])||/^0+$/.test(item.imo))continue;
+        const li=document.createElement('li'),button=document.createElement('button'),description=document.createElement('p'),sourceLink=document.createElement('a');
+        button.type='button';button.className='secondary';button.textContent='Choose '+item.name+' · IMO '+item.imo;
+        description.textContent=item.description||'No directory description. Verify this identity before use.';
+        sourceLink.textContent='Review Wikidata record '+item.id;sourceLink.href='https://www.wikidata.org/wiki/'+item.id;sourceLink.target='_blank';sourceLink.rel='noopener noreferrer';sourceLink.referrerPolicy='no-referrer';
+        button.addEventListener('click',()=>{directorySelected=true;externalImo.value=item.imo;clearExternalVesselLink();externalVesselForm.requestSubmit();directoryStatus.textContent='Selected '+item.name+' · IMO '+item.imo+'. Review the identity, then use the separate VesselFinder link below. No position has been fetched.';});
+        li.append(button,description,sourceLink);directoryResults.append(li);
+      }
+      directoryStatus.textContent=directoryResults.children.length?'Choose a matching identity below. '+payload.notice:'No checksum-valid IMO candidates found in this incomplete directory. Try another name or enter the IMO from your logistics provider below.';
+    }catch(error){if(sequence===directorySequence&&error.name!=='AbortError')directoryStatus.textContent=error.message||'Ship directory unavailable.';}
   });
   const vfForm=document.getElementById('vf-form');
   if(vfForm)vfForm.addEventListener('submit',event=>{event.preventDefault();const data=new FormData(vfForm),kind=data.get('kind'),identifier=String(data.get('identifier')||'').trim(),status=document.getElementById('vf-status'),frame=document.getElementById('vf-frame');if(!(kind==='imo'?/^[0-9]{7}$/:/^[0-9]{9}$/).test(identifier)){status.textContent='Enter a seven-digit IMO or nine-digit MMSI.';return;}const query=new URLSearchParams({kind,identifier,track:data.has('track')?'1':'0'});frame.src='{% url "vesselfinder-embed" %}?'+query.toString();frame.hidden=false;status.textContent='Requested third-party map. This app cannot verify whether a vessel position is available; inspect the widget timestamp. If blank or blocked, no position is inferred.';});
